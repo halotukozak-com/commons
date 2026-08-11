@@ -123,36 +123,36 @@ class ContainsOnlyTest extends munit.FunSuite:
   }
 
 
-//  todo: // --- integration with mapAs ---
-//
-//  test("mapAs compiles for homogeneous Int tuple") {
-//    val result = (1, 2, 3).mapAs[Int]([t <: Int] => (x: t) => List(x))
-//    assertEquals(result, (List(1), List(2), List(3)))
-//  }
-//
-//  test("mapAs compiles for homogeneous String tuple") {
-//    val result = ("a", "b").mapAs[String]([t <: String] => (x: t) => Option(x))
-//    assertEquals(result, (Some("a"), Some("b")))
-//  }
-//
-//  test("mapAs compiles for empty tuple") {
-//    val result = EmptyTuple.mapAs[Int]([t <: Int] => (x: t) => List(x))
-//    assertEquals(result, EmptyTuple)
-//  }
-//
-//  test("mapAs compiles for single element") {
-//    val result = Tuple1(42).mapAs[Int]([t <: Int] => (x: t) => Option(x))
-//    assertEquals(result, Tuple1(Some(42)))
-//  }
-//
-//  test("mapAs compiles for subtype hierarchy") {
-//    sealed trait Animal
-//    case class Dog(name: String) extends Animal
-//    case class Cat(name: String) extends Animal
-//
-//    val result = (Dog("Rex"), Cat("Whiskers")).mapAs[Animal]([t <: Animal] => (x: t) => Option(x))
-//    assertEquals(result, (Some(Dog("Rex")), Some(Cat("Whiskers"))))
-//  }
+  // --- integration with mapAs ---
+
+  test("mapAs compiles for homogeneous Int tuple") {
+    val result = (1, 2, 3).mapAs[Int]([t <: Int] => (x: t) => List(x))
+    assertEquals(result, (List(1), List(2), List(3)))
+  }
+
+  test("mapAs compiles for homogeneous String tuple") {
+    val result = ("a", "b").mapAs[String]([t <: String] => (x: t) => Option(x))
+    assertEquals(result, (Some("a"), Some("b")))
+  }
+
+  test("mapAs compiles for empty tuple") {
+    val result = EmptyTuple.mapAs[Int]([t <: Int] => (x: t) => List(x))
+    assertEquals(result, EmptyTuple)
+  }
+
+  test("mapAs compiles for single element") {
+    val result = Tuple1(42).mapAs[Int]([t <: Int] => (x: t) => Option(x))
+    assertEquals(result, Tuple1(Some(42)))
+  }
+
+  test("mapAs compiles for subtype hierarchy") {
+    sealed trait Animal
+    case class Dog(name: String) extends Animal
+    case class Cat(name: String) extends Animal
+
+    val result = (Dog("Rex"), Cat("Whiskers")).mapAs[Animal]([t <: Animal] => (x: t) => Option(x))
+    assertEquals(result, (Some(Dog("Rex")), Some(Cat("Whiskers"))))
+  }
 
   // --- does not compile cases ---
 
