@@ -51,7 +51,8 @@ class MapTupleTest extends munit.FunSuite:
 
   test("body may reference captured outer state") {
     var count = 0
-    def bump(x: Int): Int = { count += 1; x }
+    def bump(x: Int): Int =
+      count += 1; x
     val tup: (1, 2, 3) = (1, 2, 3)
     mapTuple(tup)[Int]([i <: Int] => i => bump(i))
     assertEquals(count, 3)
@@ -126,10 +127,11 @@ class MapTupleTest extends munit.FunSuite:
 
   test("body is a multi-statement block with local vals") {
     val tup: (1, 2, 3) = (1, 2, 3)
-    val res: (Int, Int, Int) = mapTuple(tup)[Int]([i <: Int] => i =>
-      val doubled = i * 2
-      val label = s"val=$doubled"
-      doubled + label.length
+    val res: (Int, Int, Int) = mapTuple(tup)[Int]([i <: Int] =>
+      i =>
+        val doubled = i * 2
+        val label = s"val=$doubled"
+        doubled + label.length,
     )
     assertEquals(res, (7, 9, 11))
   }

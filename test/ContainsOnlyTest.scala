@@ -122,7 +122,6 @@ class ContainsOnlyTest extends munit.FunSuite:
     assert(errors.nonEmpty, "Should not find evidence for wrong type")
   }
 
-
   // --- integration with mapAs ---
 
   test("mapAs compiles for homogeneous Int tuple") {

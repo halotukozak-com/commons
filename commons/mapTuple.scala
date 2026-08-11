@@ -7,7 +7,8 @@ private def mapTupleImplCore[U: Type, Tup <: Tuple: Type](
   f: Expr[[e <: U] => e => Any],
 )(
   elementAt: [E: Type] => Int => Expr[Any],
-)(using quotes: Quotes): Expr[Tuple] =
+)(using quotes: Quotes,
+): Expr[Tuple] =
   import quotes.reflect.*
 
   f.asTerm.underlying match
@@ -53,7 +54,8 @@ private def mapTupleImplCore[U: Type, Tup <: Tuple: Type](
 transparent inline def mapTuple(tup: Tuple)[U](inline f: [e <: U] => e => Any)(using tup.type containsOnly U): Tuple =
   ${ mapTupleImpl[U, tup.type]('tup, 'f) }
 
-def mapTupleImpl[U: Type, Tup <: Tuple: Type](tup: Expr[Tup], f: Expr[[e <: U] => e => Any])(using Quotes): Expr[Tuple] =
+def mapTupleImpl[U: Type, Tup <: Tuple: Type](tup: Expr[Tup], f: Expr[[e <: U] => e => Any])(using Quotes)
+  : Expr[Tuple] =
   mapTupleImplCore[U, Tup](f)([E: Type] => (index: Int) => '{ $tup(${ Expr(index) }) })
 
 transparent inline def mapTuple[Tup <: Tuple, U](inline f: [e <: U] => e => Any)(using Tup containsOnly U): Tuple =
