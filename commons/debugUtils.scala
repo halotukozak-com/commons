@@ -73,6 +73,8 @@ def symbolInfo(
      |termRef: ${Try(symbol.termRef.show).getOrElse("no termRef")}
      |""".stripMargin
 
+def typeInfo[T: Type](using quotes: Quotes) = typeReprInfo(quotes.reflect.TypeRepr.of[T])
+
 /**
  * Generates a detailed string representation of a type during macro expansion.
  *
@@ -180,7 +182,6 @@ extension (s: String)
     import quotes.reflect.*
     report.info(s"$s $position")
     s
-
 
 inline def showTypeRepr[T] = ${ showTypeReprImpl[T] }
 
