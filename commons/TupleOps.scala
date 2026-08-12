@@ -36,3 +36,6 @@ type IndicesAux[Tup <: Tuple, N <: Int] <: Tuple = Tup match
 type HasDuplicates[Tup <: Tuple] <: Boolean = Tup match
   case EmptyTuple => false
   case h *: t => Tuple.Contains[t, h] || HasDuplicates[t]
+
+inline def realCons(x: Any, tup: Tuple): x.type *: tup.type =
+  runtime.Tuples.cons(x, tup).asInstanceOf[x.type *: tup.type]
