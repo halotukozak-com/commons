@@ -1,5 +1,6 @@
 package commons
 
+import scala.collection.Factory
 import scala.compiletime.ops.boolean.||
 import scala.compiletime.ops.int.S
 import scala.reflect.ClassTag
@@ -24,6 +25,9 @@ extension (tup: Tuple)
         arr(i) = self.productElement(i).asInstanceOf[T]
         i += 1
       arr
+
+  def to[T](using tup.type containsOnly T)[C](factory: Factory[T, C]): C =
+    factory.fromSpecific(tup.productIterator.asInstanceOf[Iterator[T]])
 
 type Indices[Tup <: Tuple] <: Tuple = Tup match
   case EmptyTuple => EmptyTuple
