@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 
 class ToTest extends munit.FunSuite:
 

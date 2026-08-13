@@ -1,4 +1,4 @@
-package mirrorDerivation.fromExpr
+package halotukozak.mirrorDerivation.fromExpr
 
 class FromExprFactoryDerivationTest extends munit.FunSuite:
 

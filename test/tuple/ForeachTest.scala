@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 class ForeachTest extends munit.FunSuite:
 
   test("empty tuple does nothing") {

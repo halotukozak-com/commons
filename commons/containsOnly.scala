@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 
 type Of[T] = [Tup <: Tuple] =>> Tup containsOnly T
 

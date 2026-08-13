@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 
 import scala.quoted.{Expr, Quotes}
 

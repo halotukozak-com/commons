@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 class ToArrayOfTest extends munit.FunSuite:
 
   test("empty tuple returns empty array") {

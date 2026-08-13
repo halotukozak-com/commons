@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 class IndicesTest extends munit.FunSuite:
 
   // --- runtime tests ---

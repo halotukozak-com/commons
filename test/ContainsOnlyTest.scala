@@ -1,6 +1,6 @@
-package commons
+package halotukozak.commons
 
-import commons.containsOnly.given
+import halotukozak.commons.containsOnly.given
 
 import scala.language.implicitConversions
 

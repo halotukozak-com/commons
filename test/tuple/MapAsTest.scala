@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 class MapAsTest extends munit.FunSuite:
 
   test("mapOnly on empty tuple") {

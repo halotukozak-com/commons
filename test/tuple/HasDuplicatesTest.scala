@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 class HasDuplicatesTest extends munit.FunSuite:
 
   // --- runtime tests ---

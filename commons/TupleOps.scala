@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 
 import scala.collection.Factory
 import scala.compiletime.ops.boolean.||

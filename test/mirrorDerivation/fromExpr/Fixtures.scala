@@ -1,4 +1,4 @@
-package mirrorDerivation.fromExpr
+package halotukozak.mirrorDerivation.fromExpr
 
 import scala.quoted.*
 import scala.quoted.QuotedFactoryGivens.given
@@ -266,15 +266,31 @@ object Macro:
     Expr(tuple5FromExpr.unapply(tuple5ToExpr(original)).contains(original))
 
   def roundTripsImpl(using Quotes): Expr[Boolean] =
-    def roundTrip[T: {Type, ToExpr, FromExpr as fe}](original: T): Boolean =
-      fe.unapply(Expr(original)).contains(original)
+    def roundTrip[T: {Type, ToExpr, FromExpr as fe}](label: String, original: T): Boolean =
+      val expr = Expr(original)
+      val result = fe.unapply(expr).contains(original)
+      println(s"DEBUG roundTrip $label = $result, expr.show = ${expr.show}")
+      result
     Expr(
-      roundTrip(Point(1, 2)) && roundTrip(Mixed("m", true, 1.5)) && roundTrip(Singleton) && roundTrip(Blank()) &&
-        roundTrip[Shape](Shape.Circle(2.0)) && roundTrip[Shape](Shape.Origin) &&
-        roundTrip(Container("c", Shape.Rect(1.0, 2.0))) && roundTrip(Box(7)) && roundTrip[Result[Int]](Result.Ok(5)) &&
-        roundTrip[Result[Int]](Result.Fail) && roundTrip[Color](Color.Red) && roundTrip[Color](Color.Custom("#fff")) &&
-        roundTrip[Vehicle](Vehicle.Motorized.Car(4)) && roundTrip[Vehicle](Vehicle.Bicycle(21)) &&
-        roundTrip(Arith.Add(Arith.Lit(1), Arith.Neg(Arith.Add(Arith.Lit(2), Arith.Lit(3))))),
+      roundTrip("Point", Point(1, 2)) && roundTrip("Mixed", Mixed("m", true, 1.5)) && roundTrip(
+        "Singleton",
+        Singleton,
+      ) && roundTrip("Blank", Blank()) &&
+        roundTrip[Shape]("Shape.Circle", Shape.Circle(2.0)) && roundTrip[Shape]("Shape.Origin", Shape.Origin) &&
+        roundTrip("Container", Container("c", Shape.Rect(1.0, 2.0))) && roundTrip("Box", Box(7)) && roundTrip[
+          Result[Int],
+        ]("Result.Ok", Result.Ok(5)) &&
+        roundTrip[Result[Int]]("Result.Fail", Result.Fail) && roundTrip[Color]("Color.Red", Color.Red) && roundTrip[
+          Color,
+        ]("Color.Custom", Color.Custom("#fff")) &&
+        roundTrip[Vehicle]("Vehicle.Car", Vehicle.Motorized.Car(4)) && roundTrip[Vehicle](
+          "Vehicle.Bicycle",
+          Vehicle.Bicycle(21),
+        ) &&
+        roundTrip(
+          "Arith",
+          Arith.Add(Arith.Lit(1), Arith.Neg(Arith.Add(Arith.Lit(2), Arith.Lit(3)))),
+        ),
     )
 
   def roundTripsContainersImpl(using Quotes): Expr[Boolean] =

@@ -1,4 +1,4 @@
-package commons
+package halotukozak.commons
 
 class RealConsTest extends munit.FunSuite:
 

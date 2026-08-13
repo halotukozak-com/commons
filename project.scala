@@ -13,7 +13,7 @@
 //> using options -Wsafe-init -Werror -Wunused:all
 ////> using options -Yprofile-enabled" -Yprofile-trace:debug/compile-trace.json"
 
-//> using publish.organization io.github.halotukozak
+//> using publish.organization com.halotukozak
 //> using publish.name commons
 //> using publish.computeVersion git:tag
 //> using publish.description "halotukozak's commons"

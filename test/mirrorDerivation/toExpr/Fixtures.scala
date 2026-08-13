@@ -1,4 +1,4 @@
-package mirrorDerivation.toExpr
+package halotukozak.mirrorDerivation.toExpr
 
 import scala.quoted.*
 import scala.quoted.QuotedFactoryGivens.given
