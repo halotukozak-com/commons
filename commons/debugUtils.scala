@@ -1,4 +1,4 @@
-package commons
+package halotukozak
 import scala.quoted.*
 import scala.util.Try
 
@@ -14,7 +14,7 @@ import scala.util.Try
  * @param symbol the symbol to inspect
  * @return a multi-line string with detailed symbol information
  */
-def symbolInfo(
+private[halotukozak] def symbolInfo(
   using quotes: Quotes,
 )(
   symbol: quotes.reflect.Symbol,
@@ -73,7 +73,7 @@ def symbolInfo(
      |termRef: ${Try(symbol.termRef.show).getOrElse("no termRef")}
      |""".stripMargin
 
-def typeInfo[T: Type](using quotes: Quotes) = typeReprInfo(quotes.reflect.TypeRepr.of[T])
+private[halotukozak] def typeInfo[T: Type](using quotes: Quotes) = typeReprInfo(quotes.reflect.TypeRepr.of[T])
 
 /**
  * Generates a detailed string representation of a type during macro expansion.
@@ -86,7 +86,7 @@ def typeInfo[T: Type](using quotes: Quotes) = typeReprInfo(quotes.reflect.TypeRe
  * @param tpe the type to inspect
  * @return a multi-line string with detailed type information
  */
-def typeReprInfo(
+private[halotukozak] def typeReprInfo(
   using quotes: Quotes,
 )(
   tpe: quotes.reflect.TypeRepr,
@@ -114,7 +114,7 @@ def typeReprInfo(
      |typeArgs: ${tpe.typeArgs}
      |""".stripMargin
 
-def compareTypeReprs(
+private[halotukozak] def compareTypeReprs(
   using quotes: Quotes,
 )(
   a: quotes.reflect.TypeRepr,
@@ -123,7 +123,7 @@ def compareTypeReprs(
 ): Nothing =
   compareTypes(using a.asType, b.asType)
 
-def compareTypes[T <: AnyKind: Type, U <: AnyKind: Type](using Quotes, Position): Nothing =
+private[halotukozak] def compareTypes[T <: AnyKind: Type, U <: AnyKind: Type](using Quotes, Position): Nothing =
   import quotes.reflect.*
   s"""
      |expected:
@@ -142,14 +142,14 @@ def compareTypes[T <: AnyKind: Type, U <: AnyKind: Type](using Quotes, Position)
  * @param tree the tree to inspect
  * @return a multi-line string with tree structure and code
  */
-def treeInfo(using quotes: Quotes)(tree: quotes.reflect.Tree): String =
+private[halotukozak] def treeInfo(using quotes: Quotes)(tree: quotes.reflect.Tree): String =
   import quotes.reflect.*
   s"""
      |Structure ${Printer.TreeStructure.show(tree)}
      |ShortCode ${Printer.TreeShortCode.show(tree)}
      |""".stripMargin
 
-def positionInfo(using quotes: Quotes)(pos: quotes.reflect.Position): String =
+private[halotukozak] def positionInfo(using quotes: Quotes)(pos: quotes.reflect.Position): String =
   s"""
      |start: ${pos.start},
      |end: ${pos.end},
@@ -160,14 +160,14 @@ def positionInfo(using quotes: Quotes)(pos: quotes.reflect.Position): String =
      |sourceFile: ${pos.sourceFile},
      |""".stripMargin
 
-inline def showAst(inline body: Any) = ${ showAstImpl('{ body }) }
+private[halotukozak] inline def showAst(inline body: Any) = ${ showAstImpl('{ body }) }
 
 private def showAstImpl(body: Expr[Any])(using quotes: Quotes): Expr[Nothing] =
   given Position = Position.NoPosition
   import quotes.reflect.*
   Printer.TreeShortCode.show(body.asTerm.underlyingArgument).dbg
 
-inline def showRawAst(inline body: Any) = ${ showRawAstImpl('{ body }) }
+private[halotukozak] inline def showRawAst(inline body: Any) = ${ showRawAstImpl('{ body }) }
 
 private def showRawAstImpl(body: Expr[Any])(using quotes: Quotes): Expr[Nothing] =
   given Position = Position.NoPosition
@@ -175,36 +175,36 @@ private def showRawAstImpl(body: Expr[Any])(using quotes: Quotes): Expr[Nothing]
   Printer.TreeStructure.show(body.asTerm.underlyingArgument).dbg
 
 extension (s: String)
-  def dbg(using position: Position)(using quotes: Quotes): Nothing =
+  private[halotukozak] def dbg(using position: Position)(using quotes: Quotes): Nothing =
     import quotes.reflect.*
     report.errorAndAbort(s"$s $position")
-  def info(using position: Position)(using quotes: Quotes): String =
+  private[halotukozak] def info(using position: Position)(using quotes: Quotes): String =
     import quotes.reflect.*
     report.info(s"$s $position")
     s
 
-inline def showTypeRepr[T] = ${ showTypeReprImpl[T] }
+private[halotukozak] inline def showTypeRepr[T] = ${ showTypeReprImpl[T] }
 
 private def showTypeReprImpl[T: Type](using Quotes): Expr[Nothing] =
   given Position = Position.NoPosition
   import quotes.reflect.*
   typeReprInfo(TypeRepr.of[T]).dbg
 
-def wontHappen(using Quotes, Position) =
+private[halotukozak] def wontHappen(using Quotes, Position) =
   s"This code should never be executed".dbg
 // $COVERAGE-ON$
 
-case class Position(
+private[halotukozak] case class Position(
   startLine: Int,
   startColumn: Int,
   sourceFile: String,
 ):
   override def toString: String = s"at line $startLine, column $startColumn in $sourceFile"
 
-object Position:
-  object NoPosition extends Position(-1, -1, "<no source file>"):
+private[halotukozak] object Position:
+  private[halotukozak] object NoPosition extends Position(-1, -1, "<no source file>"):
     override def toString: String = "<no position>"
-  inline given Position = ${ impl }
+  private[halotukozak] inline given Position = ${ impl }
   private def impl(using quotes: Quotes): Expr[Position] =
     val pos = quotes.reflect.Position.ofMacroExpansion
     '{
