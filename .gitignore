@@ -52,3 +52,5 @@ scala-doc
 ### AI ###
 .claude/
 .planning/
+
+CHANGELOG.md
