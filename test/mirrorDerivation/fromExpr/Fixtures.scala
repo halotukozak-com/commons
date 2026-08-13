@@ -17,8 +17,10 @@ case class Seconds(value: Int) derives ToExprFactory, FromExprFactory
 // `derived` on a tuple type directly
 given tuple2FromExpr(using Quotes): FromExpr[(Int, String)] = FromExprFactory.derived[(Int, String)].apply()
 given tuple2ToExpr(using Quotes): ToExpr[(Int, String)] = ToExprFactory.derived[(Int, String)].apply()
-given tuple5FromExpr(using Quotes): FromExpr[(Int, String, Boolean, Double, Char)] = FromExprFactory.derived[(Int, String, Boolean, Double, Char)].apply()
-given tuple5ToExpr(using Quotes): ToExpr[(Int, String, Boolean, Double, Char)] = ToExprFactory.derived[(Int, String, Boolean, Double, Char)].apply()
+given tuple5FromExpr(using Quotes): FromExpr[(Int, String, Boolean, Double, Char)] =
+  FromExprFactory.derived[(Int, String, Boolean, Double, Char)].apply()
+given tuple5ToExpr(using Quotes): ToExpr[(Int, String, Boolean, Double, Char)] =
+  ToExprFactory.derived[(Int, String, Boolean, Double, Char)].apply()
 
 // Nested products, cross-object
 case class Address(city: String, zip: Int) derives FromExprFactory
@@ -84,10 +86,33 @@ enum Arith derives ToExprFactory, FromExprFactory:
 
 // Arity > 22 (known limitation, not a crash)
 case class Big25(
-  f1: Int, f2: Int, f3: Int, f4: Int, f5: Int, f6: Int, f7: Int, f8: Int, f9: Int, f10: Int,
-  f11: Int, f12: Int, f13: Int, f14: Int, f15: Int, f16: Int, f17: Int, f18: Int, f19: Int, f20: Int,
-  f21: Int, f22: Int, f23: Int, f24: Int, f25: Int
-) derives ToExprFactory, FromExprFactory
+  f1: Int,
+  f2: Int,
+  f3: Int,
+  f4: Int,
+  f5: Int,
+  f6: Int,
+  f7: Int,
+  f8: Int,
+  f9: Int,
+  f10: Int,
+  f11: Int,
+  f12: Int,
+  f13: Int,
+  f14: Int,
+  f15: Int,
+  f16: Int,
+  f17: Int,
+  f18: Int,
+  f19: Int,
+  f20: Int,
+  f21: Int,
+  f22: Int,
+  f23: Int,
+  f24: Int,
+  f25: Int,
+) derives ToExprFactory,
+    FromExprFactory
 
 object Macro:
   // Constructor-call recognition: `apply` and `new`
@@ -169,7 +194,7 @@ object Macro:
   def matchDeepCompanyImpl(using Quotes): Expr[Boolean] =
     check(
       '{ Company(Address("sf", 94107), Namespace.Person("ana", Address("nyc", 10001))) },
-      Company(Address("sf", 94107), Namespace.Person("ana", Address("nyc", 10001)))
+      Company(Address("sf", 94107), Namespace.Person("ana", Address("nyc", 10001))),
     )
 
   def matchSingletonImpl(using Quotes): Expr[Boolean] = check('{ Singleton }, Singleton)
@@ -204,11 +229,11 @@ object Macro:
   def matchArithNestedImpl(using Quotes): Expr[Boolean] =
     check[Arith](
       '{ Arith.Add(Arith.Lit(1), Arith.Neg(Arith.Add(Arith.Lit(2), Arith.Lit(3)))) },
-      Arith.Add(Arith.Lit(1), Arith.Neg(Arith.Add(Arith.Lit(2), Arith.Lit(3))))
+      Arith.Add(Arith.Lit(1), Arith.Neg(Arith.Add(Arith.Lit(2), Arith.Lit(3)))),
     )
 
-  def matchAscribedPointImpl(using Quotes): Expr[Boolean] = check('{ (Point(1, 2): Point) }, Point(1, 2))
-  def matchBracedPointImpl(using Quotes): Expr[Boolean] = check('{ { Point(1, 2) } }, Point(1, 2))
+  def matchAscribedPointImpl(using Quotes): Expr[Boolean] = check('{ Point(1, 2): Point }, Point(1, 2))
+  def matchBracedPointImpl(using Quotes): Expr[Boolean] = check('{ Point(1, 2) }, Point(1, 2))
 
   def nonMatchingIsNoneImpl(using Quotes): Expr[Boolean] =
     checkNone('{ if true then Point(1, 2) else Point(3, 4) })
@@ -244,21 +269,12 @@ object Macro:
     def roundTrip[T: {Type, ToExpr, FromExpr as fe}](original: T): Boolean =
       fe.unapply(Expr(original)).contains(original)
     Expr(
-      roundTrip(Point(1, 2))
-        && roundTrip(Mixed("m", true, 1.5))
-        && roundTrip(Singleton)
-        && roundTrip(Blank())
-        && roundTrip[Shape](Shape.Circle(2.0))
-        && roundTrip[Shape](Shape.Origin)
-        && roundTrip(Container("c", Shape.Rect(1.0, 2.0)))
-        && roundTrip(Box(7))
-        && roundTrip[Result[Int]](Result.Ok(5))
-        && roundTrip[Result[Int]](Result.Fail)
-        && roundTrip[Color](Color.Red)
-        && roundTrip[Color](Color.Custom("#fff"))
-        && roundTrip[Vehicle](Vehicle.Motorized.Car(4))
-        && roundTrip[Vehicle](Vehicle.Bicycle(21))
-        && roundTrip(Arith.Add(Arith.Lit(1), Arith.Neg(Arith.Add(Arith.Lit(2), Arith.Lit(3)))))
+      roundTrip(Point(1, 2)) && roundTrip(Mixed("m", true, 1.5)) && roundTrip(Singleton) && roundTrip(Blank()) &&
+        roundTrip[Shape](Shape.Circle(2.0)) && roundTrip[Shape](Shape.Origin) &&
+        roundTrip(Container("c", Shape.Rect(1.0, 2.0))) && roundTrip(Box(7)) && roundTrip[Result[Int]](Result.Ok(5)) &&
+        roundTrip[Result[Int]](Result.Fail) && roundTrip[Color](Color.Red) && roundTrip[Color](Color.Custom("#fff")) &&
+        roundTrip[Vehicle](Vehicle.Motorized.Car(4)) && roundTrip[Vehicle](Vehicle.Bicycle(21)) &&
+        roundTrip(Arith.Add(Arith.Lit(1), Arith.Neg(Arith.Add(Arith.Lit(2), Arith.Lit(3))))),
     )
 
   def roundTripsContainersImpl(using Quotes): Expr[Boolean] =
@@ -266,15 +282,10 @@ object Macro:
       fe.unapply(Expr(original)) == Some(original)
     val arrayBack = summon[FromExpr[WithArray]].unapply(Expr(WithArray(Array(1, 2, 3))))
     Expr(
-      roundTrip(Tagged(List(1, 2, 3)))
-        && roundTrip(WithOpt(Some("hi")))
-        && roundTrip(WithOpt(None))
-        && roundTrip(WithEither(Left(5): Either[Int, String]))
-        && roundTrip(WithEither(Right("r"): Either[Int, String]))
-        && roundTrip(WithMap(Map("a" -> 1, "b" -> 2)))
-        && roundTrip(WithSet(Set(1L, 2L)))
-        && roundTrip(WithTuple((1, List("a", "b"))))
-        && arrayBack.exists(_.a.sameElements(Array(1, 2, 3)))
+      roundTrip(Tagged(List(1, 2, 3))) && roundTrip(WithOpt(Some("hi"))) && roundTrip(WithOpt(None)) &&
+        roundTrip(WithEither(Left(5): Either[Int, String])) && roundTrip(WithEither(Right("r"): Either[Int, String])) &&
+        roundTrip(WithMap(Map("a" -> 1, "b" -> 2))) && roundTrip(WithSet(Set(1L, 2L))) &&
+        roundTrip(WithTuple((1, List("a", "b")))) && arrayBack.exists(_.a.sameElements(Array(1, 2, 3))),
     )
 
   // High arities push the tupleConsToExprFactory/tupleN*Factory overlap past the
@@ -288,26 +299,20 @@ object Macro:
       val fe = fef.apply()
       fe.unapply(te.apply(original)).contains(original)
     Expr(
-      roundTripFactory(Tuple1(1))
-        && roundTripFactory((1, 2))
-        && roundTripFactory((1, 2, 3))
-        && roundTripFactory((1, 2, 3, 4))
-        && roundTripFactory((1, 2, 3, 4, 5))
-        && roundTripFactory((1, 2, 3, 4, 5, 6))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21))
-        && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22))
+      roundTripFactory(Tuple1(1)) && roundTripFactory((1, 2)) && roundTripFactory((1, 2, 3)) &&
+        roundTripFactory((1, 2, 3, 4)) && roundTripFactory((1, 2, 3, 4, 5)) && roundTripFactory((1, 2, 3, 4, 5, 6)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7)) && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9)) && roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)) &&
+        roundTripFactory((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22)),
     )
