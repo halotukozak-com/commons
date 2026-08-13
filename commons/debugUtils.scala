@@ -160,14 +160,14 @@ private[halotukozak] def positionInfo(using quotes: Quotes)(pos: quotes.reflect.
      |sourceFile: ${pos.sourceFile},
      |""".stripMargin
 
-private[halotukozak] inline def showAst(inline body: Any) = ${ showAstImpl('{ body }) }
+inline private[halotukozak] def showAst(inline body: Any) = ${ showAstImpl('{ body }) }
 
 private def showAstImpl(body: Expr[Any])(using quotes: Quotes): Expr[Nothing] =
   given Position = Position.NoPosition
   import quotes.reflect.*
   Printer.TreeShortCode.show(body.asTerm.underlyingArgument).dbg
 
-private[halotukozak] inline def showRawAst(inline body: Any) = ${ showRawAstImpl('{ body }) }
+inline private[halotukozak] def showRawAst(inline body: Any) = ${ showRawAstImpl('{ body }) }
 
 private def showRawAstImpl(body: Expr[Any])(using quotes: Quotes): Expr[Nothing] =
   given Position = Position.NoPosition
@@ -183,7 +183,7 @@ extension (s: String)
     report.info(s"$s $position")
     s
 
-private[halotukozak] inline def showTypeRepr[T] = ${ showTypeReprImpl[T] }
+inline private[halotukozak] def showTypeRepr[T] = ${ showTypeReprImpl[T] }
 
 private def showTypeReprImpl[T: Type](using Quotes): Expr[Nothing] =
   given Position = Position.NoPosition
@@ -204,7 +204,7 @@ private[halotukozak] case class Position(
 private[halotukozak] object Position:
   private[halotukozak] object NoPosition extends Position(-1, -1, "<no source file>"):
     override def toString: String = "<no position>"
-  private[halotukozak] inline given Position = ${ impl }
+  inline private[halotukozak] given Position = ${ impl }
   private def impl(using quotes: Quotes): Expr[Position] =
     val pos = quotes.reflect.Position.ofMacroExpansion
     '{
