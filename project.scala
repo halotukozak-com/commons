@@ -1,7 +1,7 @@
 //> using scala 3.9.0-RC4
 
 //> using test.dep org.scalameta::munit::1.3.5
-//> using test.dep org.scala-lang::scala3-compiler:3.9.0-RC5
+//> using test.dep org.scala-lang::scala3-compiler:3.9.0-RC6
 
 //> using options -deprecation -feature -new-syntax -unchecked
 //> using options -language:noAutoTupling
