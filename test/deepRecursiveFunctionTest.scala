@@ -1,7 +1,6 @@
 package halotukozak
 package commons
 
-
 def deepSum(n: Int): Int = deepRecursive:
   if n == 0 then 0
   else 1 + deepSum(n - 1)
