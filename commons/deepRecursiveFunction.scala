@@ -27,8 +27,25 @@ def deepRecursiveImpl[T](body: Expr[T])(using Quotes, Type[T]): Expr[T] =
   )
 
   object selfCallCollector extends TreeAccumulator[List[Apply]]:
+    @tailrec def unsafeReceiver(tree: Term): Option[Term] = tree match
+      case Apply(fun, _) => unsafeReceiver(fun)
+      case Select(This(_), _) => None
+      case Select(qual, _) => Some(qual)
+      case _ => None
+
     def foldTree(acc: List[Apply], tree: Tree)(owner: Symbol): List[Apply] = tree match
-      case app @ Apply(fun, _) if fun.symbol == methSymbol => app :: acc
+      case app @ Apply(fun, _) if fun.symbol == methSymbol =>
+        unsafeReceiver(fun) match
+          case Some(receiver) =>
+            report.errorAndAbort(
+              "deepRecursive: recursive call's receiver is not `this` (e.g. `y.foo(...)` where `y` " +
+                "is a different value than the enclosing instance) - only the explicit arguments are " +
+                "threaded through the trampoline, so the receiver would be silently dropped and the " +
+                "call would keep recursing against the original receiver instead of advancing to `y`; " +
+                "turn this into an `extension` method so the receiver becomes an explicit parameter",
+              receiver.pos,
+            )
+          case None => app :: acc
       case _: If | _: Match | _: Try | _: While | _: Closure | _: DefDef =>
         foldOverTree(Nil, tree)(owner) match
           case Nil => acc

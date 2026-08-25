@@ -160,6 +160,13 @@ class DeepRecursiveFunctionTest extends munit.FunSuite:
     assert(res.contains("final expression"), res)
   }
 
+  test("rejects a recursive call whose receiver differs from this instead of silently looping on the original receiver") {
+    val res = compileErrors(
+      """final case class Box(n: Int) { def f(other: Box): Int = deepRecursive { if n == 0 then other.n else other.f(Box(n - 1)) } }""",
+    )
+    assert(res.contains("receiver"), res)
+  }
+
   test("rejects deepRecursive used inside a lambda instead of silently skipping the trampoline") {
     val res = compileErrors(
       """lazy val f: Int => Int = n => deepRecursive { if n == 0 then 0 else 1 + f(n - 1) }""",
