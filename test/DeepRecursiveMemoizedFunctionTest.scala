@@ -41,6 +41,13 @@ object DeepRecursiveMemoizedFunctionTest:
       val prev = n - 1
       1 + deepBlockSum(prev)
 
+  // the recursive call itself is bound to a `val` before the tail expression
+  def deepValBound(n: Int): Int = deepRecursiveMemoized:
+    if n == 0 then 0
+    else
+      val prev = deepValBound(n - 1)
+      1 + prev
+
   // generic type parameter - `loop` must see the enclosing method's type parameter
   def deepRepeat[A](n: Int, a: A): A = deepRecursiveMemoized:
     if n == 0 then a else deepRepeat(n - 1, a)
@@ -115,6 +122,15 @@ class DeepRecursiveMemoizedFunctionTest extends munit.FunSuite:
   test("supports a recursive call inside a block, after a local val") {
     assertEquals(deepBlockSum(0), 0)
     assertEquals(deepBlockSum(1_000_000), 1_000_000)
+  }
+
+  test("supports a recursive call bound to a val before the tail expression") {
+    assertEquals(deepValBound(0), 0)
+    assertEquals(deepValBound(10), 10)
+  }
+
+  test("is stack-safe for a recursive call bound to a val before the tail expression") {
+    assertEquals(deepValBound(1_000_000), 1_000_000)
   }
 
   test("supports a generic type parameter on the enclosing method") {
