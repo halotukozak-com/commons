@@ -153,7 +153,9 @@ class DeepRecursiveFunctionTest extends munit.FunSuite:
     assert(res.contains("cannot safely trampoline"), res)
   }
 
-  test("rejects a recursive call bound to a val before the tail expression instead of silently leaving it non-trampolined") {
+  test(
+    "rejects a recursive call bound to a val before the tail expression instead of silently leaving it non-trampolined",
+  ) {
     val res = compileErrors(
       """def f(n: Int): Int = deepRecursive { if n == 0 then 0 else { val prev = f(n - 1); 1 + prev } }""",
     )
