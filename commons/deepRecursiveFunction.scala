@@ -38,18 +38,37 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
   )
 
   object selfCallCollector extends TreeAccumulator[List[Apply]]:
+    @tailrec def unsafeReceiver(tree: Term): Option[Term] = tree match
+      case Apply(fun, _) => unsafeReceiver(fun)
+      case Select(This(_), _) => None
+      case Select(qual, _) => Some(qual)
+      case _ => None
+
     def foldTree(acc: List[Apply], tree: Tree)(owner: Symbol): List[Apply] = tree match
-      case app @ Apply(fun, _) if fun.symbol == methSymbol => app :: acc
+      case app @ Apply(fun, _) if fun.symbol == methSymbol =>
+        unsafeReceiver(fun) match
+          case Some(receiver) =>
+            report.errorAndAbort(
+              "deepRecursive: recursive call's receiver is not `this` (e.g. `y.foo(...)` where `y` " +
+                "is a different value than the enclosing instance) - only the explicit arguments are " +
+                "threaded through the trampoline, so the receiver would be silently dropped and the " +
+                "call would keep recursing against the original receiver instead of advancing to `y`; " +
+                "turn this into an `extension` method so the receiver becomes an explicit parameter",
+              receiver.pos,
+            )
+          case None => app :: acc
       case _: If | _: Match | _: Try | _: While | _: Closure | _: DefDef =>
         foldOverTree(Nil, tree)(owner) match
           case Nil => acc
           case unsafe =>
-            report.errorAndAbort(
-              "deepRecursive: recursive call is nested under a condition, loop, try, or closure " +
-                "that this macro cannot safely trampoline (it would run unconditionally and only " +
-                "once instead of following the original control flow)",
-              unsafe.head.pos,
-            )
+            unsafe.foreach: call =>
+              report.error(
+                "deepRecursive: recursive call is nested under a condition, loop, try, or closure " +
+                  "that this macro cannot safely trampoline (it would run unconditionally and only " +
+                  "once instead of following the original control flow)",
+                call.pos,
+              )
+            Nil
       case _ => foldOverTree(acc, tree)(owner)
 
   @tailrec def flattenArgs(tree: Term, acc: List[Term] = Nil): List[Term] = tree match
@@ -84,6 +103,19 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     case Match(scrutinee, cases) =>
       Match(scrutinee, cases.map(c => CaseDef(c.pattern, c.guard, transform(c.rhs))))
     case Block(stats, expr) =>
+      stats.foreach: stat =>
+        selfCallCollector.foldTree(Nil, stat)(Symbol.spliceOwner) match
+          case Nil => ()
+          case unsafe =>
+            unsafe.foreach: call =>
+              report.error(
+                "deepRecursive: recursive call happens in a statement before the block's final " +
+                  "expression (e.g. bound to a `val`) - this macro only trampolines calls it finds " +
+                  "in the final expression, so a call sequenced earlier would run as an ordinary, " +
+                  "non-tail, stack-consuming call instead of being trampolined",
+                call.pos,
+              )
+            Nil
       Block(stats, transform(expr))
     case Typed(expr, _) =>
       transform(expr)
