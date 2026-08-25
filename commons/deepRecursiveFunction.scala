@@ -1,11 +1,13 @@
 package halotukozak
 package commons
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.quoted.*
 import scala.util.control.TailCalls.{done, tailcall, TailRec}
 
-inline def deepRecursive[T](inline body: T): T = ${ deepRecursiveImpl[T]('body) }
-def deepRecursiveImpl[T](body: Expr[T])(using Quotes, Type[T]): Expr[T] =
+inline def deepRecursive[T](inline body: T): T = ${ deepRecursiveImpl[T]('body, false) }
+inline def deepRecursiveMemoized[T](inline body: T): T = ${ deepRecursiveImpl[T]('body, true) }
+def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]): Expr[T] =
   import quotes.reflect.*
 
   val methSymbol = Symbol.spliceOwner.owner
@@ -17,12 +19,21 @@ def deepRecursiveImpl[T](body: Expr[T])(using Quotes, Type[T]): Expr[T] =
     )
   val termParams = methSymbol.paramSymss.flatten.filter(_.isTerm)
 
+  val memoizedResultsSymbol = Option.when(memoized):
+    Symbol.newVal(
+      parent = methSymbol,
+      name = Symbol.freshName("memoizedResults"),
+      tpe = TypeRepr.of[mutable.Map[Any, TailRec[T]]],
+      flags = Flags.EmptyFlags,
+      privateWithin = Symbol.noSymbol,
+    )
+
   val loopMethod = Symbol.newMethod(
-    methSymbol,
-    Symbol.freshName("loop"),
-    MethodType(termParams.map(_.name))(
+    parent = methSymbol,
+    name = Symbol.freshName("loop"),
+    tpe = MethodType(termParams.map(_.name))(
       _ => termParams.map(_.termRef.widen),
-      _ => TypeRepr.of[TailRec].appliedTo(TypeRepr.of[T]),
+      _ => TypeRepr.of[TailRec[T]],
     ),
   )
 
@@ -74,14 +85,15 @@ def deepRecursiveImpl[T](body: Expr[T])(using Quotes, Type[T]): Expr[T] =
   def wrapLeaf(tree: Term): Term =
     val calls = selfCallCollector.foldTree(Nil, tree)(Symbol.spliceOwner).reverse
 
-    def buildChain(remaining: List[Apply], bound: Vector[(Term, Expr[T])]): Expr[TailRec[T]] = remaining match
-      case Nil => '{ done[T](${ replaceSubtrees(tree, bound) }) }
-      case (call @ Apply(_, _)) :: rest =>
-        '{
-          tailcall(${ Ref(loopMethod).appliedToArgs(flattenArgs(call)).asExprOf[TailRec[T]] }).flatMap { (x: T) =>
-            ${ buildChain(rest, bound :+ (call, '{ x })) }
+    def buildChain(remaining: List[Apply], bound: Vector[(find: Term, replace: Expr[T])]): Expr[TailRec[T]] =
+      remaining match
+        case Nil => '{ done[T](${ replaceSubtrees(tree, bound) }) }
+        case (call @ Apply(_, _)) :: rest =>
+          '{
+            tailcall(${ Ref(loopMethod).appliedToArgs(flattenArgs(call)).asExprOf[TailRec[T]] }).flatMap { (x: T) =>
+              ${ buildChain(rest, bound :+ (call, '{ x })) }
+            }
           }
-        }
 
     buildChain(calls, Vector.empty).asTerm
 
@@ -112,17 +124,33 @@ def deepRecursiveImpl[T](body: Expr[T])(using Quotes, Type[T]): Expr[T] =
     case _ =>
       wrapLeaf(tree)
 
-  val paramSubstitution = termParams.iterator.zip(loopMethod.paramSymss.iterator.flatten).toMap
+  val memoizedResultsValDef = memoizedResultsSymbol.map(ValDef(_, Some('{ mutable.Map.empty[Any, TailRec[T]] }.asTerm)))
 
-  object renameParams extends TreeMap:
-    override def transformTerm(t: Term)(owner: Symbol): Term = t match
-      case ident: Ident if paramSubstitution.contains(ident.symbol) =>
-        Ref(paramSubstitution(ident.symbol))
-      case _ => super.transformTerm(t)(owner)
+  val loopDefDef = DefDef(
+    loopMethod,
+    args =>
+      object renameParams extends TreeMap:
+        private val paramSubstitution = termParams.iterator.zip(args.flatten).toMap
 
-  val renamedBody = renameParams.transformTerm(body.asTerm)(loopMethod)
-  val loopBody = transform(renamedBody).changeOwner(loopMethod)
-  val loopDefDef = DefDef(loopMethod, _ => Some(loopBody))
+        override def transformTerm(t: Term)(owner: Symbol): Term = t match
+          case ident: Ident if paramSubstitution.contains(ident.symbol) =>
+            paramSubstitution(ident.symbol).asInstanceOf[Term]
+          case _ => super.transformTerm(t)(owner)
+
+      val renamedBody = renameParams.transformTerm(body.asTerm)(loopMethod)
+      val loopBody = transform(renamedBody).changeOwner(loopMethod)
+
+      memoizedResultsValDef match
+        case Some(valDef) =>
+          val map = Ref(valDef.symbol).asExprOf[mutable.Map[Any, TailRec[T]]]
+          val arguments: Expr[Any] = args.flatten match
+            case List(single) => single.asExpr
+            case multiple => Expr.ofTupleFromSeq(multiple.map(_.asExpr))
+
+          Some('{ $map.getOrElseUpdate($arguments, ${ loopBody.asExprOf[TailRec[T]] }) }.asTerm.changeOwner(loopMethod))
+        case _ =>
+          Some(loopBody),
+  )
   val loopCall = Ref(loopMethod).appliedToArgs(termParams.map(Ref.apply)).asExprOf[TailRec[T]]
 
-  Block(List(loopDefDef), '{ $loopCall.result }.asTerm).asExprOf[T]
+  Block(memoizedResultsValDef.toList :+ loopDefDef, '{ $loopCall.result }.asTerm).asExprOf[T]
