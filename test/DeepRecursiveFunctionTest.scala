@@ -1,82 +1,84 @@
 package halotukozak
 package commons
 
-def deepSum(n: Int): Int = deepRecursive:
-  if n == 0 then 0
-  else 1 + deepSum(n - 1)
+object DeepRecursiveFunctionTest:
+  def deepSum(n: Int): Int = deepRecursive:
+    if n == 0 then 0
+    else 1 + deepSum(n - 1)
 
-// the branch is itself the recursive call, with no surrounding expression (e.g. `1 + ...`)
-def deepCountDown(n: Int): Int = deepRecursive:
-  if n <= 0 then 0
-  else deepCountDown(n - 1)
+  // the branch is itself the recursive call, with no surrounding expression (e.g. `1 + ...`)
+  def deepCountDown(n: Int): Int = deepRecursive:
+    if n <= 0 then 0
+    else deepCountDown(n - 1)
 
-// two recursive calls within a single branch
-def deepFib(n: Int): Int = deepRecursive:
-  if n < 2 then n
-  else deepFib(n - 1) + deepFib(n - 2)
+  // two recursive calls within a single branch
+  def deepFib(n: Int): Int = deepRecursive:
+    if n < 2 then n
+    else deepFib(n - 1) + deepFib(n - 2)
 
-// more than two recursive calls within a single branch
-def deepTribonacci(n: Int): Long = deepRecursive:
-  if n < 2 then n.toLong
-  else if n == 2 then 1L
-  else deepTribonacci(n - 1) + deepTribonacci(n - 2) + deepTribonacci(n - 3)
+  // more than two recursive calls within a single branch
+  def deepTribonacci(n: Int): Long = deepRecursive:
+    if n < 2 then n.toLong
+    else if n == 2 then 1L
+    else deepTribonacci(n - 1) + deepTribonacci(n - 2) + deepTribonacci(n - 3)
 
-// recursion via `match` with guards, not `if`
-def deepCollatzSteps(n: Long): Int = deepRecursive:
-  n match
-    case 1L => 0
-    case x if x % 2 == 0 => 1 + deepCollatzSteps(x / 2)
-    case x => 1 + deepCollatzSteps(3 * x + 1)
+  // recursion via `match` with guards, not `if`
+  def deepCollatzSteps(n: Long): Int = deepRecursive:
+    n match
+      case 1L => 0
+      case x if x % 2 == 0 => 1 + deepCollatzSteps(x / 2)
+      case x => 1 + deepCollatzSteps(3 * x + 1)
 
-// multiple parameters - checks that parameter symbols are substituted in `loop`
-def deepSumAcc(n: Int, acc: Long): Long = deepRecursive:
-  if n == 0 then acc
-  else deepSumAcc(n - 1, acc + n)
+  // multiple parameters - checks that parameter symbols are substituted in `loop`
+  def deepSumAcc(n: Int, acc: Long): Long = deepRecursive:
+    if n == 0 then acc
+    else deepSumAcc(n - 1, acc + n)
 
-// recursive call in the last expression of a block, after a local val
-def deepBlockSum(n: Int): Int = deepRecursive:
-  if n == 0 then 0
-  else
-    val prev = n - 1
-    1 + deepBlockSum(prev)
+  // recursive call in the last expression of a block, after a local val
+  def deepBlockSum(n: Int): Int = deepRecursive:
+    if n == 0 then 0
+    else
+      val prev = n - 1
+      1 + deepBlockSum(prev)
 
-// generic type parameter - `loop` must see the enclosing method's type parameter
-def deepRepeat[A](n: Int, a: A): A = deepRecursive:
-  if n == 0 then a else deepRepeat(n - 1, a)
+  // generic type parameter - `loop` must see the enclosing method's type parameter
+  def deepRepeat[A](n: Int, a: A): A = deepRecursive:
+    if n == 0 then a else deepRepeat(n - 1, a)
 
-final case class Bump(amount: Int)
+  final case class Bump(amount: Int)
 
-// a trailing `using` clause - the recursive call is a curried, multi-clause Apply
-def deepWithBump(n: Int)(using bump: Bump): Int = deepRecursive:
-  if n == 0 then 0 else bump.amount + deepWithBump(n - 1)
+  // a trailing `using` clause - the recursive call is a curried, multi-clause Apply
+  def deepWithBump(n: Int)(using bump: Bump): Int = deepRecursive:
+    if n == 0 then 0 else bump.amount + deepWithBump(n - 1)
 
-// a context bound desugars to its own synthesized `using` clause, exercising the same
-// multi-clause flattening as an explicit `using` clause, plus evidence use inside the loop
-def deepSumWith[A: Numeric](n: Int, a: A): A = deepRecursive:
-  if n == 0 then a
-  else deepSumWith(n - 1, Numeric[A].plus(a, Numeric[A].one))
+  // a context bound desugars to its own synthesized `using` clause, exercising the same
+  // multi-clause flattening as an explicit `using` clause, plus evidence use inside the loop
+  def deepSumWith[A: Numeric](n: Int, a: A): A = deepRecursive:
+    if n == 0 then a
+    else deepSumWith(n - 1, Numeric[A].plus(a, Numeric[A].one))
 
-final case class Step(amount: Int)
+  final case class Step(amount: Int)
 
-// an old-style `implicit` clause (as opposed to `using`) - same multi-clause shape
-def deepImplicitStep(n: Int)(implicit step: Step): Int = deepRecursive:
-  if n == 0 then 0 else step.amount + deepImplicitStep(n - 1)
+  // an old-style `implicit` clause (as opposed to `using`) - same multi-clause shape
+  def deepImplicitStep(n: Int)(implicit step: Step): Int = deepRecursive:
+    if n == 0 then 0 else step.amount + deepImplicitStep(n - 1)
 
-// plain (non-macro) reference implementations to compare results against
-def plainFib(n: Int): Int =
-  if n < 2 then n else plainFib(n - 1) + plainFib(n - 2)
+  // plain (non-macro) reference implementations to compare results against
+  def plainFib(n: Int): Int =
+    if n < 2 then n else plainFib(n - 1) + plainFib(n - 2)
 
-def plainTribonacci(n: Int): Long =
-  if n < 2 then n.toLong
-  else if n == 2 then 1L
-  else plainTribonacci(n - 1) + plainTribonacci(n - 2) + plainTribonacci(n - 3)
+  def plainTribonacci(n: Int): Long =
+    if n < 2 then n.toLong
+    else if n == 2 then 1L
+    else plainTribonacci(n - 1) + plainTribonacci(n - 2) + plainTribonacci(n - 3)
 
-def plainCollatzSteps(n: Long): Int =
-  if n == 1L then 0
-  else if n % 2 == 0 then 1 + plainCollatzSteps(n / 2)
-  else 1 + plainCollatzSteps(3 * n + 1)
+  def plainCollatzSteps(n: Long): Int =
+    if n == 1L then 0
+    else if n % 2 == 0 then 1 + plainCollatzSteps(n / 2)
+    else 1 + plainCollatzSteps(3 * n + 1)
 
 class DeepRecursiveFunctionTest extends munit.FunSuite:
+  import DeepRecursiveFunctionTest.*
 
   test("computes the correct result for shallow recursion with one call per branch") {
     assertEquals(deepSum(0), 0)
