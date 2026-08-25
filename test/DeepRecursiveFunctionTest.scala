@@ -41,6 +41,21 @@ object DeepRecursiveFunctionTest:
       val prev = n - 1
       1 + deepBlockSum(prev)
 
+  // the recursive call itself is bound to a `val` before the tail expression
+  def deepValBound(n: Int): Int = deepRecursive:
+    if n == 0 then 0
+    else
+      val prev = deepValBound(n - 1)
+      1 + prev
+
+  // multiple `val`s, each binding a recursive call, chained before the tail expression
+  def deepChainedVals(n: Int): Int = deepRecursive:
+    if n <= 1 then n
+    else
+      val a = deepChainedVals(n - 1)
+      val b = deepChainedVals(n - 2)
+      a + b
+
   // generic type parameter - `loop` must see the enclosing method's type parameter
   def deepRepeat[A](n: Int, a: A): A = deepRecursive:
     if n == 0 then a else deepRepeat(n - 1, a)
@@ -117,6 +132,19 @@ class DeepRecursiveFunctionTest extends munit.FunSuite:
     assertEquals(deepBlockSum(1_000_000), 1_000_000)
   }
 
+  test("supports a recursive call bound to a val before the tail expression") {
+    assertEquals(deepValBound(0), 0)
+    assertEquals(deepValBound(10), 10)
+  }
+
+  test("is stack-safe for a recursive call bound to a val before the tail expression") {
+    assertEquals(deepValBound(1_000_000), 1_000_000)
+  }
+
+  test("supports multiple vals, each binding a recursive call, chained before the tail expression") {
+    (0 to 20).foreach(n => assertEquals(deepChainedVals(n), plainFib(n), s"n = $n"))
+  }
+
   test("supports a generic type parameter on the enclosing method") {
     assertEquals(deepRepeat(0, "x"), "x")
     assertEquals(deepRepeat(5, "x"), "x")
@@ -155,11 +183,23 @@ class DeepRecursiveFunctionTest extends munit.FunSuite:
     assert(res.contains("cannot safely trampoline"), res)
   }
 
-  test(
-    "rejects a recursive call bound to a val before the tail expression instead of silently leaving it non-trampolined",
-  ) {
+  test("rejects a recursive call bound to a lazy val before the tail expression instead of running it eagerly") {
     val res = compileErrors(
-      """def f(n: Int): Int = deepRecursive { if n == 0 then 0 else { val prev = f(n - 1); 1 + prev } }""",
+      """def f(n: Int): Int = deepRecursive { if n == 0 then 0 else { lazy val prev = f(n - 1); 1 + prev } }""",
+    )
+    assert(res.contains("lazy val"), res)
+  }
+
+  test("rejects a recursive call bound to a var before the tail expression instead of ignoring reassignment") {
+    val res = compileErrors(
+      """def f(n: Int): Int = deepRecursive { if n == 0 then 0 else { var prev = f(n - 1); 1 + prev } }""",
+    )
+    assert(res.contains("var"), res)
+  }
+
+  test("rejects a recursive call in a non-val statement before the tail expression instead of silently leaving it non-trampolined") {
+    val res = compileErrors(
+      """def f(n: Int): Int = deepRecursive { if n == 0 then 0 else { f(n - 1); 1 } }""",
     )
     assert(res.contains("final expression"), res)
   }
