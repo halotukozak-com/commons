@@ -33,12 +33,14 @@ def deepRecursiveImpl[T](body: Expr[T])(using Quotes, Type[T]): Expr[T] =
         foldOverTree(Nil, tree)(owner) match
           case Nil => acc
           case unsafe =>
-            report.errorAndAbort(
-              "deepRecursive: recursive call is nested under a condition, loop, try, or closure " +
-                "that this macro cannot safely trampoline (it would run unconditionally and only " +
-                "once instead of following the original control flow)",
-              unsafe.head.pos,
-            )
+            unsafe.foreach: call =>
+              report.error(
+                "deepRecursive: recursive call is nested under a condition, loop, try, or closure " +
+                  "that this macro cannot safely trampoline (it would run unconditionally and only " +
+                  "once instead of following the original control flow)",
+                call.pos,
+              )
+            Nil
       case _ => foldOverTree(acc, tree)(owner)
 
   @tailrec def flattenArgs(tree: Term, acc: List[Term] = Nil): List[Term] = tree match
@@ -72,6 +74,19 @@ def deepRecursiveImpl[T](body: Expr[T])(using Quotes, Type[T]): Expr[T] =
     case Match(scrutinee, cases) =>
       Match(scrutinee, cases.map(c => CaseDef(c.pattern, c.guard, transform(c.rhs))))
     case Block(stats, expr) =>
+      stats.foreach: stat =>
+        selfCallCollector.foldTree(Nil, stat)(Symbol.spliceOwner) match
+          case Nil => ()
+          case unsafe =>
+            unsafe.foreach: call =>
+              report.error(
+                "deepRecursive: recursive call happens in a statement before the block's final " +
+                  "expression (e.g. bound to a `val`) - this macro only trampolines calls it finds " +
+                  "in the final expression, so a call sequenced earlier would run as an ordinary, " +
+                  "non-tail, stack-consuming call instead of being trampolined",
+                call.pos,
+              )
+            Nil
       Block(stats, transform(expr))
     case Typed(expr, _) =>
       transform(expr)
