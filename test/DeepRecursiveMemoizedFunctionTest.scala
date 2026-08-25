@@ -154,6 +154,19 @@ class DeepRecursiveMemoizedFunctionTest extends munit.FunSuite:
     assert(calls <= 31, s"expected at most 31 calls with memoization, got $calls")
   }
 
+  test("memoizes multi-parameter calls (the key is a Tuple, not a single value)") {
+    var calls = 0
+    def countedChoose(n: Int, k: Int): Long = deepRecursiveMemoized:
+      calls += 1
+      if k == 0 || k == n then 1L
+      else countedChoose(n - 1, k - 1) + countedChoose(n - 1, k)
+
+    assertEquals(countedChoose(20, 10), 184756L)
+    // naive recursion visits an exponential number of (n, k) pairs; memoization bounds it
+    // to roughly one compute per distinct pair.
+    assert(calls <= 20 * 10 + 20, s"expected roughly n*k calls with memoization, got $calls")
+  }
+
   test("does not memoize across separate top-level invocations") {
     var calls = 0
     def countedDouble(n: Int): Int = deepRecursiveMemoized:

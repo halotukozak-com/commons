@@ -11,7 +11,9 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
   import quotes.reflect.*
 
   type Result = TailRec[T]
-  type Memo = mutable.Map[Tuple, Result]
+  // `Any` rather than `Tuple` so a single-parameter recursive function can use its
+  // argument directly as the key instead of paying for a `Tuple1` wrapper on every call.
+  type Memo = mutable.Map[Any, Result]
   type Binding = (find: Term, replace: Expr[T])
 
   val methSymbol = Symbol.spliceOwner.owner
@@ -95,7 +97,7 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     case _ =>
       wrapLeaf(tree)
 
-  val memoizedResultsValDef = memoizedResultsSymbol.map(ValDef(_, Some('{ mutable.Map.empty[Tuple, Result] }.asTerm)))
+  val memoizedResultsValDef = memoizedResultsSymbol.map(ValDef(_, Some('{ mutable.Map.empty[Any, Result] }.asTerm)))
   val map = memoizedResultsSymbol.map(sym => Ref(sym).asExprOf[Memo])
 
   val loopDefDef = DefDef(
@@ -121,7 +123,9 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
           )
           val computeDefDef = DefDef(computeSymbol, _ => Some(loopBody(computeSymbol)))
 
-          val arguments = Expr.ofTupleFromSeq(args.flatten.map(_.asExpr))
+          val arguments: Expr[Any] = args.flatten match
+            case List(single) => single.asExpr
+            case multiple => Expr.ofTupleFromSeq(multiple.map(_.asExpr))
           val computeCall = Ref(computeSymbol).appliedToNone.asExprOf[Result]
           Some(Block(List(computeDefDef), '{ $map.getOrElseUpdate($arguments, $computeCall) }.asTerm))
         case _ =>
