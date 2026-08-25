@@ -10,12 +10,6 @@ inline def deepRecursiveMemoized[T](inline body: T): T = ${ deepRecursiveImpl[T]
 def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]): Expr[T] =
   import quotes.reflect.*
 
-  type Result = TailRec[T]
-  // `Any` rather than `Tuple` so a single-parameter recursive function can use its
-  // argument directly as the key instead of paying for a `Tuple1` wrapper on every call.
-  type Memo = mutable.Map[Any, Result]
-  type Binding = (find: Term, replace: Expr[T])
-
   val methSymbol = Symbol.spliceOwner.owner
   if methSymbol.flags.is(Flags.Synthetic) then
     report.errorAndAbort(
@@ -29,7 +23,7 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     Symbol.newVal(
       parent = methSymbol,
       name = Symbol.freshName("memoizedResults"),
-      tpe = TypeRepr.of[Memo],
+      tpe = TypeRepr.of[mutable.Map[Any, TailRec[T]]],
       flags = Flags.EmptyFlags,
       privateWithin = Symbol.noSymbol,
     )
@@ -39,7 +33,7 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     name = Symbol.freshName("loop"),
     tpe = MethodType(termParams.map(_.name))(
       _ => termParams.map(_.termRef.widen),
-      _ => TypeRepr.of[Result],
+      _ => TypeRepr.of[TailRec[T]],
     ),
   )
 
@@ -62,7 +56,7 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     case Apply(fun, args) => flattenArgs(fun, args ::: acc)
     case _ => acc
 
-  def replaceSubtrees(tree: Term, mapping: Seq[Binding]): Expr[T] =
+  def replaceSubtrees(tree: Term, mapping: Seq[(find: Term, replace: Expr[T])]): Expr[T] =
     object replacer extends TreeMap:
       override def transformTerm(t: Term)(owner: Symbol): Term =
         mapping.find(_.find eq t).map(_.replace.asTerm).getOrElse(super.transformTerm(t)(owner))
@@ -72,14 +66,15 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
   def wrapLeaf(tree: Term): Term =
     val calls = selfCallCollector.foldTree(Nil, tree)(Symbol.spliceOwner).reverse
 
-    def buildChain(remaining: List[Apply], bound: Vector[Binding]): Expr[Result] = remaining match
-      case Nil => '{ done[T](${ replaceSubtrees(tree, bound) }) }
-      case (call @ Apply(_, _)) :: rest =>
-        '{
-          tailcall(${ Ref(loopMethod).appliedToArgs(flattenArgs(call)).asExprOf[Result] }).flatMap { (x: T) =>
-            ${ buildChain(rest, bound :+ (call, '{ x })) }
+    def buildChain(remaining: List[Apply], bound: Vector[(find: Term, replace: Expr[T])]): Expr[TailRec[T]] =
+      remaining match
+        case Nil => '{ done[T](${ replaceSubtrees(tree, bound) }) }
+        case (call @ Apply(_, _)) :: rest =>
+          '{
+            tailcall(${ Ref(loopMethod).appliedToArgs(flattenArgs(call)).asExprOf[TailRec[T]] }).flatMap { (x: T) =>
+              ${ buildChain(rest, bound :+ (call, '{ x })) }
+            }
           }
-        }
 
     buildChain(calls, Vector.empty).asTerm
 
@@ -97,8 +92,7 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     case _ =>
       wrapLeaf(tree)
 
-  val memoizedResultsValDef = memoizedResultsSymbol.map(ValDef(_, Some('{ mutable.Map.empty[Any, Result] }.asTerm)))
-  val map = memoizedResultsSymbol.map(sym => Ref(sym).asExprOf[Memo])
+  val memoizedResultsValDef = memoizedResultsSymbol.map(ValDef(_, Some('{ mutable.Map.empty[Any, TailRec[T]] }.asTerm)))
 
   val loopDefDef = DefDef(
     loopMethod,
@@ -112,25 +106,31 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
           case _ => super.transformTerm(t)(owner)
 
       val renamedBody = renameParams.transformTerm(body.asTerm)(loopMethod)
-      def loopBody(owner: Symbol): Term = transform(renamedBody).changeOwner(owner)
+      val loopBody = transform(renamedBody).changeOwner(loopMethod)
 
-      map match
-        case Some(map) =>
-          val computeSymbol = Symbol.newMethod(
-            parent = loopMethod,
-            name = Symbol.freshName("compute"),
-            tpe = MethodType(Nil)(_ => Nil, _ => TypeRepr.of[Result]),
-          )
-          val computeDefDef = DefDef(computeSymbol, _ => Some(loopBody(computeSymbol)))
-
+      memoizedResultsValDef match
+        case Some(valDef) =>
+          val map = Ref(valDef.symbol).asExprOf[mutable.Map[Any, TailRec[T]]]
           val arguments: Expr[Any] = args.flatten match
             case List(single) => single.asExpr
             case multiple => Expr.ofTupleFromSeq(multiple.map(_.asExpr))
-          val computeCall = Ref(computeSymbol).appliedToNone.asExprOf[Result]
-          Some(Block(List(computeDefDef), '{ $map.getOrElseUpdate($arguments, $computeCall) }.asTerm))
+          // A freshly built '{...} defaults to owner = Symbol.spliceOwner (methSymbol), not
+          // loopMethod, even though this tree ends up as loopMethod's body - so the whole
+          // thing needs re-owning, not just the spliced-in loopBody. (`Symbol.asQuotes` looks
+          // like the "proper" fix but its own owner check is unreliable when methSymbol is a
+          // local def nested in a lambda, which we need to support - see git history.)
+          Some('{
+            val key = $arguments
+            $map.get(key) match
+              case Some(cached) => cached
+              case None =>
+                val computed = ${ loopBody.asExprOf[TailRec[T]] }
+                $map.update(key, computed)
+                computed
+          }.asTerm.changeOwner(loopMethod))
         case _ =>
-          Some(loopBody(loopMethod)),
+          Some(loopBody),
   )
-  val loopCall = Ref(loopMethod).appliedToArgs(termParams.map(Ref.apply)).asExprOf[Result]
+  val loopCall = Ref(loopMethod).appliedToArgs(termParams.map(Ref.apply)).asExprOf[TailRec[T]]
 
   Block(memoizedResultsValDef.toList :+ loopDefDef, '{ $loopCall.result }.asTerm).asExprOf[T]
