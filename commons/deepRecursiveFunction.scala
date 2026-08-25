@@ -114,20 +114,8 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
           val arguments: Expr[Any] = args.flatten match
             case List(single) => single.asExpr
             case multiple => Expr.ofTupleFromSeq(multiple.map(_.asExpr))
-          // A freshly built '{...} defaults to owner = Symbol.spliceOwner (methSymbol), not
-          // loopMethod, even though this tree ends up as loopMethod's body - so the whole
-          // thing needs re-owning, not just the spliced-in loopBody. (`Symbol.asQuotes` looks
-          // like the "proper" fix but its own owner check is unreliable when methSymbol is a
-          // local def nested in a lambda, which we need to support - see git history.)
-          Some('{
-            val key = $arguments
-            $map.get(key) match
-              case Some(cached) => cached
-              case None =>
-                val computed = ${ loopBody.asExprOf[TailRec[T]] }
-                $map.update(key, computed)
-                computed
-          }.asTerm.changeOwner(loopMethod))
+
+          Some('{ $map.getOrElseUpdate($arguments, ${ loopBody.asExprOf[TailRec[T]] }) }.asTerm.changeOwner(loopMethod))
         case _ =>
           Some(loopBody),
   )
