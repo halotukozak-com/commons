@@ -1,4 +1,4 @@
-group:
+scalafmt:
   repos: |
     halotukozak-com/alpaca
     halotukozak-com/made
@@ -8,3 +8,13 @@ group:
   files:
     - source: .scalafmt.conf
       dest: .scalafmt.conf
+
+renovate:
+  repos: |
+    halotukozak-com/made
+    halotukozak-com/mcodec
+    halotukozak-com/mrpc
+    halotukozak-com/regex
+  files:
+    - source: renovate.json
+      dest: renovate.json

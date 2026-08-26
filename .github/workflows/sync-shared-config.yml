@@ -1,10 +1,11 @@
-name: Sync scalafmt config
+name: Sync shared config
 
 on:
   push:
     branches: [master]
     paths:
       - .scalafmt.conf
+      - renovate.json
   workflow_dispatch:
 
 jobs:
