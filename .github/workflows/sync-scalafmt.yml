@@ -1,0 +1,18 @@
+name: Sync scalafmt config
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .scalafmt.conf
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: BetaHuhn/repo-file-sync-action@v1
+        with:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          CONFIG_PATH: .github/sync.yml
