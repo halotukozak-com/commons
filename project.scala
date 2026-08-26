@@ -1,4 +1,4 @@
-//> using scala 3.9.0-RC6
+//> using scala 3.9.0
 
 //> using test.dep org.scalameta::munit::1.3.5
 //> using test.dep org.scala-lang::scala3-compiler:3.9.0-RC6
