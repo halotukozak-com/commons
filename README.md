@@ -1,8 +1,9 @@
 # commons
 
 halotukozak's small collection of Scala 3 macro and metaprogramming utilities: tuple operations
-backed by type-level constraints, and typeclass-derivation factories that make `FromExpr`/`ToExpr`
-derivation work recursively for generic types.
+backed by type-level constraints, typeclass-derivation factories that make `FromExpr`/`ToExpr`
+derivation work recursively for generic types, and a macro that rewrites deeply recursive `def`s
+into stack-safe trampolines.
 
 Cross-built for the JVM, Scala.js, and Scala Native. Published to Maven Central under `com.halotukozak`.
 
@@ -49,6 +50,52 @@ libraryDependencies += "com.halotukozak" %% "commons" % "<version>"
 import scala.quoted.*
 
 case class Point(x: Int, y: Int) derives ToExprFactory, FromExprFactory
+```
+
+### Deep recursion
+
+- `deepRecursive[T](body: T): T` — rewrites a self-recursive `def` into a trampolined loop at
+  compile time, so it runs in constant stack space instead of overflowing on deep input.
+- `deepRecursiveMemoized[T](body: T): T` — same rewrite, plus a per-invocation memo table keyed
+  on the method's arguments, so overlapping recursive subcalls (e.g. naive Fibonacci) are computed
+  only once.
+
+```scala
+def deepSum(n: Int): Int = deepRecursive:
+  if n == 0 then 0
+  else 1 + deepSum(n - 1)
+
+deepSum(1_000_000) // does not stack overflow
+
+def deepFib(n: Int): Int = deepRecursiveMemoized:
+  if n < 2 then n
+  else deepFib(n - 1) + deepFib(n - 2)
+```
+
+The macro must be used directly in the body of a named `def` (not inside a lambda), and it looks
+for the recursive call in tail position: the final expression of the body/block, a branch of an
+`if`/`match`, or a plain (non-lazy, non-`var`) `val` bound before the final expression. A call
+nested under a `try`/`while`/closure, or reached through an unsafe receiver, is rejected at
+compile time rather than silently miscompiled.
+
+Recursion is also recognized when threaded through a `.map` call on the recursed-over element —
+out of the box for `List`, `Vector`, `Set`, `Option`, and `Either`, and extendable to other
+containers via a `given TailRecTraversable[F]`.
+
+```scala
+enum Tree:
+  case Leaf(n: Int)
+  case Node(children: List[Tree])
+
+def deepSumTree(t: Tree): Int = deepRecursive:
+  t match
+    case Tree.Leaf(n) => n
+    case Tree.Node(children) => children.map(deepSumTree).sum
+
+case class Wrapped(n: Int, inner: Option[Wrapped])
+
+def deepSumOption(w: Wrapped): Int = deepRecursive:
+  w.n + w.inner.map(deepSumOption).getOrElse(0)
 ```
 
 ## License
