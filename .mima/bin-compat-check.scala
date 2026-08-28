@@ -1,15 +1,21 @@
 //> using scala 2.13
 //> using dep com.typesafe::mima-core:1.1.6
 
-// Backward + forward binary-compatibility check between a released artifact and
-// the current build, via MiMa's core API (there is no scala-cli MiMa plugin).
+// Binary-compatibility check between a released artifact and the current
+// build, via MiMa's core API (there is no scala-cli MiMa plugin).
 //
 // Usage: scala-cli run .mima/bin-compat-check.scala -- <oldJar> <newJar> <sharedClasspath>
 //   oldJar          the previously released library JAR
 //   newJar          the freshly built library JAR (scala-cli package --library)
 //   sharedClasspath pathSeparator-joined dependency classpath (scala3-library, deps, …)
 //
-// Exit code: 0 if compatible, 1 if any problems were found.
+// Only *backward* compatibility (can code compiled against oldJar still link
+// against newJar) gates the exit code — that's the actual SemVer contract a
+// same-major release makes. *Forward* is printed for context (it's what's new
+// since oldJar) but always has "problems" whenever you add API, so it's never
+// a reason to fail on its own.
+//
+// Exit code: 0 if backward-compatible, 1 otherwise.
 
 import java.io.File
 import com.typesafe.tools.mima.lib.MiMaLib
@@ -35,8 +41,8 @@ object BinCompatCheck {
       }
 
     report("backward (code built against the release vs the new JAR)", backward)
-    report("forward  (code built against the new JAR vs the release)", forward)
+    report("forward  (new API vs the release — expected to list additions)", forward)
 
-    if (backward.nonEmpty || forward.nonEmpty) sys.exit(1)
+    if (backward.nonEmpty) sys.exit(1)
   }
 }
