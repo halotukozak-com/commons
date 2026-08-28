@@ -190,7 +190,7 @@ private def showTypeReprImpl[T: Type](using Quotes): Expr[Nothing] =
   import quotes.reflect.*
   typeReprInfo(TypeRepr.of[T]).dbg
 
-private[halotukozak] def wontHappenTmpRenameForMimaTest(using Quotes, Position) =
+private[halotukozak] def wontHappen(using Quotes, Position) =
   s"This code should never be executed".dbg
 // $COVERAGE-ON$
 
