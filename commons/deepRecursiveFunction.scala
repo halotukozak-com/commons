@@ -152,12 +152,18 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
 
     detector.foldTree(false, tree)(Symbol.spliceOwner)
 
-  def wrapLeaf(tree: Term, cont: Term => Term): Term =
+  enum TreePosition:
+    case Tail, Inner
+
+  def wrapLeaf(tree: Term, cont: Term => Term)(using callSite: TreePosition): Term =
     val calls = selfCallCollector.foldTree(Nil, tree)(Symbol.spliceOwner).reverse
 
     def buildChain(remaining: List[Apply], bound: Vector[(find: Term, replace: Expr[Any])]): Expr[TailRec[T]] =
       remaining match
         case Nil => cont(replaceSubtrees(tree, bound)).asExprOf[TailRec[T]]
+        case (call @ Apply(fun, _)) :: rest
+            if fun.symbol == methSymbol && rest.isEmpty && callSite == TreePosition.Tail && (tree eq call) =>
+          '{ tailcall(${ Ref(loopMethod).appliedToArgs(flattenArgs(call)).asExprOf[TailRec[T]] }) }
         case (call @ Apply(fun, _)) :: rest if fun.symbol == methSymbol =>
           '{
             tailcall(${ Ref(loopMethod).appliedToArgs(flattenArgs(call)).asExprOf[TailRec[T]] }).flatMap { (x: T) =>
@@ -176,7 +182,8 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
                   ${
                     val substituted =
                       SubstituteIdents(Map(param.symbol -> '{ e }.asTerm)).transformTerm(rhs)(Symbol.spliceOwner)
-                    transform(substituted, t => '{ done[T](${ t.asExprOf[T] }) }.asTerm).asExprOf[TailRec[T]]
+                    transform(substituted, t => '{ done[T](${ t.asExprOf[T] }) }.asTerm)(using TreePosition.Tail)
+                      .asExprOf[TailRec[T]]
                   }
                 }
               tailRecTraversablesCache.get(qual.tpe.widen) match
@@ -199,7 +206,7 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
 
     buildChain(calls, Vector.empty).asTerm
 
-  def transform(tree: Term, cont: Term => Term): Term = tree match
+  def transform(tree: Term, cont: Term => Term)(using TreePosition): Term = tree match
     case If(cond, thenp, elsep) =>
       If(cond, transform(thenp, cont), transform(elsep, cont))
     case Match(scrutinee, cases) =>
@@ -213,7 +220,7 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     case _ =>
       wrapLeaf(tree, cont)
 
-  def transformBlock(stats: List[Statement], expr: Term, cont: Term => Term): Term = stats match
+  def transformBlock(stats: List[Statement], expr: Term, cont: Term => Term)(using TreePosition): Term = stats match
     case Nil =>
       transform(expr, cont)
     case (valDef @ ValDef(_, _, Some(rhs))) :: rest
@@ -224,7 +231,7 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
           substituteIdent(Block(rest, expr), valDef.symbol, boundValue).match
             case Block(newStats, newExpr) => transformBlock(newStats, newExpr, cont)
             case newExpr => transformBlock(Nil, newExpr, cont),
-      )
+      )(using TreePosition.Inner)
     case (valDef @ ValDef(_, _, Some(rhs))) :: rest if containsSelfCall(rhs) =>
       selfCallCollector
         .foldTree(Nil, rhs)(Symbol.spliceOwner)
@@ -257,7 +264,8 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     args =>
       val paramSubstitution = termParams.iterator.zip(args.flatten.map(_.asInstanceOf[Term])).toMap
       val renamedBody = SubstituteIdents(paramSubstitution).transformTerm(body.asTerm)(loopMethod)
-      val loopBody = transform(renamedBody, t => '{ done[T](${ t.asExprOf[T] }) }.asTerm).changeOwner(loopMethod)
+      val loopBody = transform(renamedBody, t => '{ done[T](${ t.asExprOf[T] }) }.asTerm)(using TreePosition.Tail)
+        .changeOwner(loopMethod)
 
       memoizedResultsValDef match
         case Some(valDef) =>
