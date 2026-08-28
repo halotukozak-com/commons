@@ -182,9 +182,8 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
               tailRecTraversablesCache.get(qual.tpe.widen) match
                 case Some('{ $evExpr: TailRecTraversable[f] }) =>
                   '{
-                    tailcall($evExpr.traverse[elem, T](${ qual.asExprOf[f[elem]] })($stepExpr)).flatMap {
-                      (xs: f[T]) =>
-                        ${ buildChain(rest, bound :+ (call, '{ xs })) }
+                    tailcall($evExpr.traverse[elem, T](${ qual.asExprOf[f[elem]] })($stepExpr)).flatMap { (xs: f[T]) =>
+                      ${ buildChain(rest, bound :+ (call, '{ xs })) }
                     }
                   }
                 case _ =>
