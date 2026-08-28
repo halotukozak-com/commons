@@ -18,21 +18,24 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "scala-cli cross-built deps (::) in project.scala",
-      "managerFilePatterns": ["/(^|/)project\\.scala$/"],
+      "description": "Scala cross-built deps (scala-cli :: / sbt %%) in project.scala and README",
+      "managerFilePatterns": ["/(^|/)project\\.scala$/", "/(^|/)README\\.md$/"],
       "matchStrings": [
-        "//> using (?:test\\.)?dep (?<groupId>[\\w.-]+)::(?<artifactId>[\\w.-]+):{1,2}(?<currentValue>[\\w.-]+)"
+        "//> using (?:test\\.)?dep (?<groupId>[\\w.-]+)::(?<artifactId>[\\w.-]+):{1,2}(?<currentValue>[\\w.-]+)",
+        "\"(?<groupId>[\\w.-]+)\" %% \"(?<artifactId>[\\w.-]+)\" % \"(?<currentValue>[\\w.-]+)\""
       ],
       "packageNameTemplate": "{{groupId}}:{{artifactId}}_3",
       "datasourceTemplate": "sbt-package"
     },
     {
       "customType": "regex",
-      "description": "scala-cli plain maven-coordinate deps in project.scala",
-      "managerFilePatterns": ["/(^|/)project\\.scala$/"],
+      "description": "Plain Maven-coordinate deps (scala-cli : / sbt %) in project.scala and README",
+      "managerFilePatterns": ["/(^|/)project\\.scala$/", "/(^|/)README\\.md$/"],
       "matchStrings": [
-        "//> using (?:test\\.)?dep (?<packageName>[\\w.-]+:[\\w.-]+):(?<currentValue>[\\w.-]+)"
+        "//> using (?:test\\.)?dep (?<groupId>[\\w.-]+):(?<artifactId>[\\w.-]+):(?<currentValue>[\\w.-]+)",
+        "\"(?<groupId>[\\w.-]+)\" % \"(?<artifactId>[\\w.-]+)\" % \"(?<currentValue>[\\w.-]+)\""
       ],
+      "packageNameTemplate": "{{groupId}}:{{artifactId}}",
       "datasourceTemplate": "maven"
     },
     {
@@ -70,17 +73,6 @@
       "packageNameTemplate": "scala-native/scala-native",
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.+)$"
-    },
-    {
-      "customType": "regex",
-      "description": "commons version in README install snippets",
-      "managerFilePatterns": ["/^README\\.md$/"],
-      "matchStrings": [
-        "com\\.halotukozak::commons::(?<currentValue>[\\w.-]+)",
-        "\"com\\.halotukozak\" %% \"commons\" % \"(?<currentValue>[\\w.-]+)\""
-      ],
-      "depNameTemplate": "com.halotukozak:commons_3",
-      "datasourceTemplate": "maven"
     }
   ]
 }
