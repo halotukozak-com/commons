@@ -1,20 +1,18 @@
-scalafmt:
-  repos: |
-    halotukozak-com/alpaca
-    halotukozak-com/made
-    halotukozak-com/mcodec
-    halotukozak-com/mrpc
-    halotukozak-com/regex
-  files:
-    - source: .scalafmt.conf
-      dest: .scalafmt.conf
-
-renovate:
-  repos: |
-    halotukozak-com/made
-    halotukozak-com/mcodec
-    halotukozak-com/mrpc
-    halotukozak-com/regex
-  files:
-    - source: renovate.json
-      dest: renovate.json
+group:
+  - repos: |
+      halotukozak-com/alpaca
+      halotukozak-com/made
+      halotukozak-com/mcodec
+      halotukozak-com/mrpc
+      halotukozak-com/regex
+    files:
+      - source: .scalafmt.conf
+        dest: .scalafmt.conf
+  - repos: |
+      halotukozak-com/made
+      halotukozak-com/mcodec
+      halotukozak-com/mrpc
+      halotukozak-com/regex
+    files:
+      - source: renovate.json
+        dest: renovate.json
