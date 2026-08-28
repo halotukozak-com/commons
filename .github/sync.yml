@@ -9,6 +9,7 @@ group:
       - source: .scalafmt.conf
         dest: .scalafmt.conf
   - repos: |
+      halotukozak-com/alpaca
       halotukozak-com/made
       halotukozak-com/mcodec
       halotukozak-com/mrpc
