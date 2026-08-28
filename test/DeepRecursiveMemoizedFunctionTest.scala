@@ -6,6 +6,11 @@ object DeepRecursiveMemoizedFunctionTest:
     if n == 0 then 0
     else 1 + deepSum(n - 1)
 
+  // the .map closure ignores its own element and calls back into an outer-scope self-call -
+  // each list element triggers its own independent recursive computation
+  def deepRepeatedCall(n: Int): Int = deepRecursiveMemoized:
+    if n == 0 then 1 else List(1, 2, 3).map(_ => deepRepeatedCall(n - 1)).sum
+
   // the branch is itself the recursive call, with no surrounding expression (e.g. `1 + ...`)
   def deepCountDown(n: Int): Int = deepRecursiveMemoized:
     if n <= 0 then 0
@@ -197,11 +202,10 @@ class DeepRecursiveMemoizedFunctionTest extends munit.FunSuite:
     assertEquals(calls, 6, "each top-level call should get its own fresh memo table")
   }
 
-  test("rejects a recursive call nested inside a closure instead of silently changing its call count") {
-    val res = compileErrors(
-      """def f(n: Int): Int = deepRecursiveMemoized { if n == 0 then 0 else List(1, 2, 3).map(_ => f(n - 1)).sum }""",
-    )
-    assert(res.contains("cannot safely trampoline"), res)
+  test("supports a .map closure that ignores its own element and calls back into an outer-scope self-call") {
+    assertEquals(deepRepeatedCall(0), 1)
+    assertEquals(deepRepeatedCall(1), 3)
+    assertEquals(deepRepeatedCall(2), 9)
   }
 
   test("rejects a recursive call nested inside a try instead of silently looping forever") {

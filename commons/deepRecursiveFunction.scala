@@ -7,8 +7,14 @@ import scala.util.control.TailCalls.{done, tailcall, TailRec}
 
 inline def deepRecursive[T](inline body: T): T = ${ deepRecursiveImpl[T]('body, false) }
 inline def deepRecursiveMemoized[T](inline body: T): T = ${ deepRecursiveImpl[T]('body, true) }
+
 def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]): Expr[T] =
   import quotes.reflect.*
+
+  class SubstituteIdents(substitution: Map[Symbol, Term]) extends TreeMap:
+    override def transformTerm(t: Term)(owner: Symbol): Term = t match
+      case ident: Ident if substitution.contains(ident.symbol) => substitution(ident.symbol)
+      case _ => super.transformTerm(t)(owner)
 
   val methSymbol = Symbol.spliceOwner.owner
   if methSymbol.flags.is(Flags.Synthetic) then
@@ -37,12 +43,52 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     ),
   )
 
+  val MapSelect: PartialFunction[Term, Term] =
+    case Select(qual, "map") => qual
+    case TypeApply(Select(qual, "map"), _) => qual
+
+  object tailRecTraversablesCache:
+    private val underlying = mutable.Map.empty[Type[?], Option[Expr[TailRecTraversable[?]]]]
+
+    private def tailRecTraversableApplied(tpe: TypeRepr): Option[Type[TailRecTraversable[?]]] =
+      tpe match
+        case AppliedType(tycon, args) if args.nonEmpty =>
+          val fixedArgs = args.init
+          val ctor = if fixedArgs.isEmpty then tycon
+          else
+            TypeLambda(
+              List("X"),
+              _ => List(TypeBounds.empty),
+              tl => AppliedType(tycon, fixedArgs :+ tl.param(0)),
+            )
+          ctor.asType match
+            case '[type f[_]; f] =>
+              Some(Type.of[TailRecTraversable[f]].asInstanceOf[Type[TailRecTraversable[?]]])
+        case _ => None
+
+    def get(tpe: TypeRepr): Option[Expr[TailRecTraversable[?]]] =
+      tailRecTraversableApplied(tpe).flatMap: tc =>
+        underlying.getOrElseUpdate(tc, Expr.summon(using tc))
+
+    def exists(tpe: TypeRepr): Boolean = get(tpe).isDefined
+
+  object stripTransparent:
+    @tailrec def unapply(tree: Term): Some[Term] = tree.underlyingArgument match
+      case Typed(e, _) => stripTransparent.unapply(e)
+      case other => Some(other)
+
   object selfCallCollector extends TreeAccumulator[List[Apply]]:
     @tailrec def unsafeReceiver(tree: Term): Option[Term] = tree match
       case Apply(fun, _) => unsafeReceiver(fun)
       case Select(This(_), _) => None
       case Select(qual, _) => Some(qual)
       case _ => None
+
+    object mentionsSelfCall extends TreeAccumulator[Boolean]:
+      def foldTree(acc: Boolean, tree: Tree)(owner: Symbol): Boolean = acc ||
+        (tree match
+          case Apply(fun, _) if fun.symbol == methSymbol => true
+          case _ => foldOverTree(acc, tree)(owner))
 
     def foldTree(acc: List[Apply], tree: Tree)(owner: Symbol): List[Apply] = tree match
       case app @ Apply(fun, _) if fun.symbol == methSymbol =>
@@ -57,15 +103,20 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
               receiver.pos,
             )
           case None => app :: acc
+      case app @ Apply(MapSelect(qual), List(fnArg))
+          if tailRecTraversablesCache.exists(qual.tpe.widen) &&
+            mentionsSelfCall.foldTree(false, fnArg)(Symbol.spliceOwner) =>
+        app :: acc
       case _: If | _: Match | _: Try | _: While | _: Closure | _: DefDef =>
         foldOverTree(Nil, tree)(owner) match
           case Nil => acc
           case unsafe =>
             unsafe.foreach: call =>
               report.error(
-                "deepRecursive: recursive call is nested under a condition, loop, try, or closure " +
-                  "that this macro cannot safely trampoline (it would run unconditionally and only " +
-                  "once instead of following the original control flow)",
+                """|recursive call is nested under a condition, loop, try, or closure
+                   |that this macro cannot safely trampoline (it would run unconditionally and only
+                   |once instead of following the original control flow)
+                   |""".stripIndent(),
                 call.pos,
               )
             Nil
@@ -75,12 +126,12 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
     case Apply(fun, args) => flattenArgs(fun, args ::: acc)
     case _ => acc
 
-  def replaceSubtrees(tree: Term, mapping: Seq[(find: Term, replace: Expr[T])]): Term =
-    object replacer extends TreeMap:
+  def replaceSubtrees(tree: Term, mapping: Seq[(find: Term, replace: Expr[Any])]): Term =
+    object substituter extends TreeMap:
       override def transformTerm(t: Term)(owner: Symbol): Term =
         mapping.find(_.find eq t).map(_.replace.asTerm).getOrElse(super.transformTerm(t)(owner))
 
-    replacer.transformTerm(tree)(Symbol.spliceOwner)
+    substituter.transformTerm(tree)(Symbol.spliceOwner)
 
   def substituteIdent(tree: Term, symbol: Symbol, replacement: Term): Term =
     object substituter extends TreeMap:
@@ -104,15 +155,47 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
   def wrapLeaf(tree: Term, cont: Term => Term): Term =
     val calls = selfCallCollector.foldTree(Nil, tree)(Symbol.spliceOwner).reverse
 
-    def buildChain(remaining: List[Apply], bound: Vector[(find: Term, replace: Expr[T])]): Expr[TailRec[T]] =
+    def buildChain(remaining: List[Apply], bound: Vector[(find: Term, replace: Expr[Any])]): Expr[TailRec[T]] =
       remaining match
         case Nil => cont(replaceSubtrees(tree, bound)).asExprOf[TailRec[T]]
-        case (call @ Apply(_, _)) :: rest =>
+        case (call @ Apply(fun, _)) :: rest if fun.symbol == methSymbol =>
           '{
             tailcall(${ Ref(loopMethod).appliedToArgs(flattenArgs(call)).asExprOf[TailRec[T]] }).flatMap { (x: T) =>
               ${ buildChain(rest, bound :+ (call, '{ x })) }
             }
           }
+        case (call @ Apply(MapSelect(qual), List(stripTransparent(Lambda(List(param), rhs))))) :: rest =>
+          val elemTpe = qual.tpe.widen match
+            case AppliedType(_, args) if args.nonEmpty => args.last
+            case _ => report.errorAndAbort("could not destructure the traversed container's type", call.pos)
+
+          elemTpe.asType match
+            case '[elem] =>
+              val stepExpr: Expr[elem => TailRec[T]] =
+                '{ (e: elem) =>
+                  ${
+                    val substituted =
+                      SubstituteIdents(Map(param.symbol -> '{ e }.asTerm)).transformTerm(rhs)(Symbol.spliceOwner)
+                    transform(substituted, t => '{ done[T](${ t.asExprOf[T] }) }.asTerm).asExprOf[TailRec[T]]
+                  }
+                }
+              tailRecTraversablesCache.get(qual.tpe.widen) match
+                case Some('{ $evExpr: TailRecTraversable[f] }) =>
+                  '{
+                    tailcall($evExpr.traverse[elem, T](${ qual.asExprOf[f[elem]] })($stepExpr)).flatMap { (xs: f[T]) =>
+                      ${ buildChain(rest, bound :+ (call, '{ xs })) }
+                    }
+                  }
+                case _ =>
+                  report.errorAndAbort(
+                    "recognized a .map traversal but found no TailRecTraversable instance for it",
+                    call.pos,
+                  )
+
+        case (call @ Apply(MapSelect(_), List(_))) :: _ =>
+          report.errorAndAbort("could not destructure the .map closure", call.pos)
+        case (call @ Apply(_, _)) :: _ =>
+          report.errorAndAbort("unrecognized self-call shape", call.pos)
 
     buildChain(calls, Vector.empty).asTerm
 
@@ -172,15 +255,8 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
   val loopDefDef = DefDef(
     loopMethod,
     args =>
-      object renameParams extends TreeMap:
-        private val paramSubstitution = termParams.iterator.zip(args.flatten).toMap
-
-        override def transformTerm(t: Term)(owner: Symbol): Term = t match
-          case ident: Ident if paramSubstitution.contains(ident.symbol) =>
-            paramSubstitution(ident.symbol).asInstanceOf[Term]
-          case _ => super.transformTerm(t)(owner)
-
-      val renamedBody = renameParams.transformTerm(body.asTerm)(loopMethod)
+      val paramSubstitution = termParams.iterator.zip(args.flatten.map(_.asInstanceOf[Term])).toMap
+      val renamedBody = SubstituteIdents(paramSubstitution).transformTerm(body.asTerm)(loopMethod)
       val loopBody = transform(renamedBody, t => '{ done[T](${ t.asExprOf[T] }) }.asTerm).changeOwner(loopMethod)
 
       memoizedResultsValDef match
