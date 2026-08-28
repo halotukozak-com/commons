@@ -3,6 +3,18 @@
   "extends": [
     "config:recommended"
   ],
+  "packageRules": [
+    {
+      "description": "Toolchain deps: only final X.Y.Z releases (no RC/M/nightly/-bin-)",
+      "matchDepNames": [
+        "scala3",
+        "org.scala-lang:scala3-compiler_3",
+        "scala-js",
+        "scala-native"
+      ],
+      "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/"
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
@@ -34,6 +46,41 @@
       "packageNameTemplate": "scala/scala3",
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "scala-cli --js-version in GitHub workflows",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "--js-version (?<currentValue>[\\w.-]+)"
+      ],
+      "depNameTemplate": "scala-js",
+      "packageNameTemplate": "scala-js/scala-js",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "scala-cli --native-version in GitHub workflows",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "--native-version (?<currentValue>[\\w.-]+)"
+      ],
+      "depNameTemplate": "scala-native",
+      "packageNameTemplate": "scala-native/scala-native",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "commons version in README install snippets",
+      "managerFilePatterns": ["/^README\\.md$/"],
+      "matchStrings": [
+        "com\\.halotukozak::commons::(?<currentValue>[\\w.-]+)",
+        "\"com\\.halotukozak\" %% \"commons\" % \"(?<currentValue>[\\w.-]+)\""
+      ],
+      "depNameTemplate": "com.halotukozak:commons_3",
+      "datasourceTemplate": "maven"
     }
   ]
 }
