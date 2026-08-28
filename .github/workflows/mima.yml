@@ -1,0 +1,58 @@
+name: Binary compatibility
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Report-only for now: pre-1.0, and the check itself is a prototype. Problems
+# are surfaced as a warning + job summary, they don't fail the build.
+jobs:
+  mima:
+    name: MiMa (binary)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup coursier cache
+        uses: coursier/cache-action@v8.1
+      - uses: VirtusLab/scala-cli-setup@v1
+      - name: Check binary compatibility against the last release
+        run: |
+          set -euo pipefail
+
+          base_tag=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          if [ -z "$base_tag" ]; then
+            echo "No release tag yet — nothing to compare against." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          base_version=${base_tag#v}
+          org=$(grep -oP '(?<=using publish.organization ).*' project.scala | tr -d '"')
+          name=$(grep -oP '(?<=using publish.name ).*' project.scala | tr -d '"')
+          echo "Baseline: $org:${name}_3:$base_version"
+
+          scala-cli --power package . --library -o "$RUNNER_TEMP/new.jar" --force
+
+          printf '' > "$RUNNER_TEMP/empty.scala"
+          old_cp=$(scala-cli --power compile "$RUNNER_TEMP/empty.scala" --dependency "$org::$name:$base_version" --print-class-path | tail -1)
+          old_jar=$(printf '%s' "$old_cp" | tr ':' '\n' | grep "/${name}_3/$base_version/")
+          shared_cp=$(scala-cli --power compile . --print-class-path | tail -1)
+
+          set +e
+          scala-cli run .mima/bin-compat-check.scala -- "$old_jar" "$RUNNER_TEMP/new.jar" "$shared_cp" | tee "$RUNNER_TEMP/mima-out.txt"
+          status=$?
+          set -e
+
+          if [ $status -ne 0 ]; then
+            {
+              echo "### MiMa found binary incompatibilities vs \`$base_version\`"
+              echo '```'
+              cat "$RUNNER_TEMP/mima-out.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Binary compatibility::MiMa found incompatibilities vs $base_version — see the job summary"
+          else
+            echo "Binary compatible with \`$base_version\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
