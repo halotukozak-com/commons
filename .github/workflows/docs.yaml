@@ -36,7 +36,7 @@ jobs:
           scala-cli --power doc . -- \
           -project "commons" \
           -project-version ${{ github.ref_name }} \
-          -project-footer "halotukozak's commons" \
+          -project-footer "made with ❤️ and coffee" \
           -social-links:github::https://github.com/halotukozak/commons \
           -snippet-compiler:compile \
           -source-links:"src=github://halotukozak/commons?tag=${{ github.ref_name }}" \
