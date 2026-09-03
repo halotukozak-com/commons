@@ -36,14 +36,9 @@ object containsOnly extends containsOnlyLowPriority:
 
   import scala.language.implicitConversions
 
-  inline def headConv[Tup <: Tuple, T](
-    inline head: Tuple.Head[Tup],
-  )(using inline ev: Tup containsOnly T,
-  ): T = head.asInstanceOf[T]
-  inline def lastConv[Tup <: Tuple, T](
-    inline last: Tuple.Last[Tup],
-  )(using inline ev: Tup containsOnly T,
-  ): T = last.asInstanceOf[T]
+  given [Tup <: Tuple: Of[T], T] => Conversion[Tuple.Head[Tup], T] = _.asInstanceOf[T]
+
+  given [Tup <: Tuple: Of[T], T] => Conversion[Tuple.Last[Tup], T] = _.asInstanceOf[T]
 
 sealed trait containsOnlyLowPriority:
   inline given Tuple containsOnly Any = containsOnly.refl
