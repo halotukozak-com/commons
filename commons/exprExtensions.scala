@@ -17,7 +17,7 @@ extension (companion: Expr.type)
   def ofRefinedTuple(exprs: List[Expr[?]])(using Quotes): Expr[Tuple] =
     import quotes.reflect.*
     exprs match
-      case Nil => '{ EmptyTuple }
+      case Nil => '{ EmptyTuple: EmptyTuple }
       case _ =>
         val tpe = exprs.foldRight(TypeRepr.of[EmptyTuple]): (e, acc) =>
           TypeRepr.of[*:].appliedTo(List(e.asTerm.tpe.widenTermRefByName, acc))
