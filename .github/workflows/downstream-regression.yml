@@ -23,6 +23,10 @@ jobs:
       # Arbitrary placeholder version used to wire each project's local build to the previous
       # one via the local Ivy repo, instead of whatever real version is currently released.
       REGRESSION_VERSION: 0.0.0-regression
+      # scala-cli's default 30s wait for the Bloop compilation server to come up is too tight
+      # on a cold GH Actions runner and flakes with a bare TimeoutException; give it more room.
+      # (No env var for this - it has to be passed on every scala-cli invocation below.)
+      BLOOP_TIMEOUT: --bloop-startup-timeout 2min
     steps:
       - name: Checkout commons
         uses: actions/checkout@v7
@@ -39,7 +43,7 @@ jobs:
 
       - name: Publish commons locally
         working-directory: commons
-        run: scala-cli --power publish local . --project-version "$REGRESSION_VERSION" --platform jvm
+        run: scala-cli --power publish local . --project-version "$REGRESSION_VERSION" --platform jvm $BLOOP_TIMEOUT
 
       - name: Checkout made
         uses: actions/checkout@v7
@@ -51,10 +55,10 @@ jobs:
         run: sed -i -E "s#(com\.halotukozak::commons::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" project.scala
       - name: Compile made
         working-directory: made
-        run: scala-cli --power compile . --platform jvm
+        run: scala-cli --power compile . --platform jvm $BLOOP_TIMEOUT
       - name: Publish made locally
         working-directory: made
-        run: scala-cli --power publish local . --project-version "$REGRESSION_VERSION" --platform jvm
+        run: scala-cli --power publish local . --project-version "$REGRESSION_VERSION" --platform jvm $BLOOP_TIMEOUT
 
       - name: Checkout mcodec
         uses: actions/checkout@v7
@@ -70,10 +74,10 @@ jobs:
         # it out of this compile check (a bare `.` would pull it in too and fail unrelated to
         # this check, since it pins its own commons/made/mcodec dev versions).
         working-directory: mcodec
-        run: scala-cli --power compile project.scala src --platform jvm
+        run: scala-cli --power compile project.scala src --platform jvm $BLOOP_TIMEOUT
       - name: Publish mcodec locally
         working-directory: mcodec
-        run: scala-cli --power publish local project.scala src --project-version "$REGRESSION_VERSION" --platform jvm
+        run: scala-cli --power publish local project.scala src --project-version "$REGRESSION_VERSION" --platform jvm $BLOOP_TIMEOUT
 
       - name: Checkout alpaca
         uses: actions/checkout@v7
