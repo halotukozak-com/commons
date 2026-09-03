@@ -16,7 +16,7 @@ extension (tup: Tuple)
     : Tuple.Map[tup.type, [X] =>> F[X & T]] =
     tup.map[[X] =>> F[X & T]]([t] => (t: t) => f(t.asInstanceOf[t & T]))
 
-  inline def toArrayOf[T: ClassTag](using inline ev: tup.type containsOnly T): Array[T] = tup match
+  inline def toArrayOf[T](using inline ev: tup.type containsOnly T)(using ClassTag[T]): Array[T] = tup match
     case EmptyTuple => Array.empty[T]
     case self: Product =>
       val arr = new Array[T](self.productArity)
