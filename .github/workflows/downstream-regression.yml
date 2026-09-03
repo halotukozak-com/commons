@@ -87,4 +87,4 @@ jobs:
           sed -i -E "s#(com\.halotukozak::mcodec::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
       - name: Compile alpaca
         working-directory: alpaca
-        run: ./mill jvm.compile
+        run: ./mill __.test
