@@ -6,17 +6,17 @@ import scala.compiletime.ops.int.S
 import scala.reflect.ClassTag
 
 extension (tup: Tuple)
-  inline def foreach(f: [t] => t => Unit): Unit = tup.map[[X] =>> Unit](f)
+  def foreach(f: [t] => t => Unit): Unit = tup.map[[X] =>> Unit](f)
 
-  inline def indices: Indices[tup.type] = Tuple.fromArray(Array.range(0, tup.size)).asInstanceOf[Indices[tup.type]]
+  def indices: Indices[tup.type] = Tuple.fromArray(Array.range(0, tup.size)).asInstanceOf[Indices[tup.type]]
 
   inline def hasDuplicates: HasDuplicates[tup.type] = compiletime.constValue[HasDuplicates[tup.type]]
 
-  inline def mapAs[T](using inline ev: tup.type containsOnly T)[F[_ <: T]](inline f: [t <: T] => t => F[t])
+  def mapAs[T](using tup.type containsOnly T)[F[_ <: T]](f: [t <: T] => t => F[t])
     : Tuple.Map[tup.type, [X] =>> F[X & T]] =
     tup.map[[X] =>> F[X & T]]([t] => (t: t) => f(t.asInstanceOf[t & T]))
 
-  inline def toArrayOf[T](using inline ev: tup.type containsOnly T)(using ClassTag[T]): Array[T] = tup match
+  def toArrayOf[T](using tup.type containsOnly T)(using ClassTag[T]): Array[T] = tup match
     case EmptyTuple => Array.empty[T]
     case self: Product =>
       val arr = new Array[T](self.productArity)
@@ -25,8 +25,7 @@ extension (tup: Tuple)
         arr(i) = self.productElement(i).asInstanceOf[T]
         i += 1
       arr
-
-  inline def to[T](using inline ev: tup.type containsOnly T)[C](factory: Factory[T, C]): C =
+  def to[T](using tup.type containsOnly T)[C](factory: Factory[T, C]): C =
     factory.fromSpecific(tup.productIterator.asInstanceOf[Iterator[T]])
 
 type Indices[Tup <: Tuple] <: Tuple = Tup match
@@ -41,5 +40,5 @@ type HasDuplicates[Tup <: Tuple] <: Boolean = Tup match
   case EmptyTuple => false
   case h *: t => Tuple.Contains[t, h] || HasDuplicates[t]
 
-inline def realCons(x: Any, tup: Tuple): x.type *: tup.type =
+def realCons(x: Any, tup: Tuple): x.type *: tup.type =
   runtime.Tuples.cons(x, tup).asInstanceOf[x.type *: tup.type]

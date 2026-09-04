@@ -2,8 +2,6 @@ package halotukozak.commons
 
 import halotukozak.commons.containsOnly.given
 
-import scala.language.implicitConversions
-
 class ContainsOnlyTest extends munit.FunSuite:
 
   // --- Loop type-level: positive cases ---
