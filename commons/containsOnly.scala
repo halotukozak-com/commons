@@ -15,30 +15,32 @@ object containsOnly extends containsOnlyLowPriority:
 
   def refl[Tup <: Tuple, T]: Tup containsOnly T = reusable
 
-  inline given [Tup <: Tuple, T] => (Loop[Tup, T] =:= true) => containsOnly[Tup, T] = refl
+  given [Tup <: Tuple, T](using Loop[Tup, T] =:= true): containsOnly[Tup, T] = refl
 
   /** A constant map `[_] =>> C` makes every element `C`. Unifies even for abstract `Es`. */
-  inline given [Es <: Tuple, C] => (Tuple.Map[Es, [_] =>> C] containsOnly C) = refl
+  given [Es <: Tuple, C] => (Tuple.Map[Es, [_] =>> C] containsOnly C) = refl
 
   /** A covariant `F` gives `F[e] <: F[Any]` for every element (invariant `F` still needs `refl`). */
-  inline given [Es <: Tuple, F[+_]] => (Tuple.Map[Es, F] containsOnly F[Any]) = refl
+  given [Es <: Tuple, F[+_]] => (Tuple.Map[Es, F] containsOnly F[Any]) = refl
 
-  inline given [Tup <: Tuple, T](using inline ev: Tup containsOnly T): (Tuple.Tail[Tup] containsOnly T) = refl
-  inline given [Tup <: Tuple, T](using inline ev: Tup containsOnly T): (Tuple.Reverse[Tup] containsOnly T) = refl
-  inline given [Tup1 <: Tuple, Tup2 <: Tuple, T](
-    using inline ev1: Tup1 containsOnly T,
+  given [Tup <: Tuple, T](using ev: Tup containsOnly T): (Tuple.Tail[Tup] containsOnly T) = refl
+
+  given [Tup <: Tuple, T](using ev: Tup containsOnly T): (Tuple.Reverse[Tup] containsOnly T) = refl
+
+  given [Tup1 <: Tuple, Tup2 <: Tuple, T](
+    using ev1: Tup1 containsOnly T,
     ev2: Tup2 containsOnly T,
   ): (Tuple.Concat[Tup1, Tup2] containsOnly T) = refl
-  inline given [Tup1 <: Tuple, Tup2 <: Tuple, T1, T2](
-    using inline ev1: Tup1 containsOnly T1,
+
+  given [Tup1 <: Tuple, Tup2 <: Tuple, T1, T2](
+    using ev1: Tup1 containsOnly T1,
     ev2: Tup2 containsOnly T2,
   ): (Tuple.Zip[Tup1, Tup2] containsOnly (T1, T2)) = refl
 
-  import scala.language.implicitConversions
 
-  given [Tup <: Tuple: Of[T], T] => Conversion[Tuple.Head[Tup], T] = _.asInstanceOf[T]
+  given [Tup <: Tuple, This >: Tup <: Tuple, T](using ev: Tup containsOnly T): (Tuple.Head[This] <:< T) = <:<.refl.asInstanceOf[(Tuple.Head[This] <:< T)]
 
-  given [Tup <: Tuple: Of[T], T] => Conversion[Tuple.Last[Tup], T] = _.asInstanceOf[T]
+  given [Tup <: Tuple, This >: Tup <: Tuple, T](using ev: Tup containsOnly T): (Tuple.Last[This] <:< T) = <:<.refl.asInstanceOf[(Tuple.Last[This] <:< T)]
 
 sealed trait containsOnlyLowPriority:
-  inline given Tuple containsOnly Any = containsOnly.refl
+  given Tuple containsOnly Any = containsOnly.refl
