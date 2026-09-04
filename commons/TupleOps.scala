@@ -12,14 +12,11 @@ extension (tup: Tuple)
 
   inline def hasDuplicates: HasDuplicates[tup.type] = compiletime.constValue[HasDuplicates[tup.type]]
 
-  def mapAs[T](using ev: tup.type containsOnly T)[F[_ <: T]](f: [t <: T] => t => F[t])
-  : Tuple.Map[tup.type, [X] =>> F[X & T]] =
+  def mapAs[T](using tup.type containsOnly T)[F[_ <: T]](f: [t <: T] => t => F[t])
+    : Tuple.Map[tup.type, [X] =>> F[X & T]] =
     tup.map[[X] =>> F[X & T]]([t] => (t: t) => f(t.asInstanceOf[t & T]))
 
-  def toArrayOf[T](using ev: tup.type containsOnly T)(using ClassTag[T]): Array[T] =
-    toArrayOfImpl[T]
-
-  private def toArrayOfImpl[T: ClassTag]: Array[T] = tup match
+  def toArrayOf[T](using tup.type containsOnly T)(using ClassTag[T]): Array[T] = tup match
     case EmptyTuple => Array.empty[T]
     case self: Product =>
       val arr = new Array[T](self.productArity)
@@ -28,9 +25,7 @@ extension (tup: Tuple)
         arr(i) = self.productElement(i).asInstanceOf[T]
         i += 1
       arr
-  def to[T](using ev: tup.type containsOnly T)[C](factory: Factory[T, C]): C =
-    toImpl(factory)
-  def toImpl[T, C](factory: Factory[T, C]): C =
+  def to[T](using tup.type containsOnly T)[C](factory: Factory[T, C]): C =
     factory.fromSpecific(tup.productIterator.asInstanceOf[Iterator[T]])
 
 type Indices[Tup <: Tuple] <: Tuple = Tup match
