@@ -424,7 +424,9 @@ class ContainsOnlyTest extends munit.FunSuite:
     summon[Tuple.Map[tuple.type, Option] containsOnly Option[Any]]
   }
 
-  test("Tuple.Fold has no blanket containsOnly given: it depends entirely on F, so only Union (a specific Fold) is covered") {
+  test(
+    "Tuple.Fold has no blanket containsOnly given: it depends entirely on F, so only Union (a specific Fold) is covered",
+  ) {
     val tuple: Tuple = (1, 2, 3)
     given tuple.type containsOnly Int = containsOnly.refl
 
