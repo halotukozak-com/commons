@@ -211,8 +211,8 @@ class ContainsOnlyTest extends munit.FunSuite:
     assertEquals(last, 3)
   }
 
-  // `containsOnly` only provides Head/Last → T conversions today. Operations like
-  // `apply(i)`, `drop`, `take`, `tail`, `init`, `reverse`, `mapAs`, `toList`, `++`
+  // `containsOnly` provides Head/Last/Elem → T conversions today. Operations like
+  // `drop`, `take`, `tail`, `init`, `reverse`, `mapAs`, `toList`, `++`
   // need the static tuple shape to reduce match types, which we don't carry on an
   // abstract `Tuple` value. Coverage for those would require a richer evidence type.
 
@@ -334,4 +334,119 @@ class ContainsOnlyTest extends munit.FunSuite:
     val tuple = ("one", "two", "three")
 
     summon[Tuple.Reverse[tuple.type] containsOnly String]
+  }
+
+  test("Tuple.Elem gives evidence at an arbitrary index") {
+    val tuple: Tuple = ("one", "two", "three")
+    given tuple.type containsOnly String = containsOnly.refl
+
+    // N=0 is deliberately not tested here: it collides with the dedicated Head evidence
+    // (both reduce to the same type), which is exactly why Elem is given lower priority.
+    summon[Tuple.Elem[tuple.type, 1] <:< String]
+    summon[Tuple.Elem[tuple.type, 2] <:< String]
+  }
+
+  test("Tuple.Init preserves containsOnly") {
+    val tuple = ("one", "two", "three")
+
+    summon[Tuple.Init[tuple.type] containsOnly String]
+  }
+
+  test("Tuple.Take preserves containsOnly") {
+    val tuple = ("one", "two", "three")
+
+    summon[Tuple.Take[tuple.type, 0] containsOnly String]
+    summon[Tuple.Take[tuple.type, 2] containsOnly String]
+    summon[Tuple.Take[tuple.type, 3] containsOnly String]
+  }
+
+  test("Tuple.Drop preserves containsOnly") {
+    val tuple = ("one", "two", "three")
+
+    summon[Tuple.Drop[tuple.type, 0] containsOnly String]
+    summon[Tuple.Drop[tuple.type, 1] containsOnly String]
+    summon[Tuple.Drop[tuple.type, 3] containsOnly String]
+  }
+
+  test("Tuple.Filter preserves containsOnly") {
+    val tuple = ("one", "two", "three")
+
+    type IsString[X] <: Boolean = X match
+      case String => true
+      case _ => false
+
+    summon[Tuple.Filter[tuple.type, IsString] containsOnly String]
+  }
+
+  test("Tuple.Filter preserves containsOnly for an abstract Tuple") {
+    val tuple: Tuple = ("one", "two", "three")
+    given tuple.type containsOnly String = containsOnly.refl
+
+    type IsString[X] <: Boolean = X match
+      case String => true
+      case _ => false
+
+    summon[Tuple.Filter[tuple.type, IsString] containsOnly String]
+  }
+
+  test("Tuple.Union gives evidence for the union of all elements") {
+    val tuple: Tuple = ("one", "two", "three")
+    given tuple.type containsOnly String = containsOnly.refl
+
+    summon[Tuple.Union[tuple.type] <:< String]
+  }
+
+  test("Tuple.Append preserves containsOnly") {
+    val tuple = ("one", "two", "three")
+
+    summon[Tuple.Append[tuple.type, "four"] containsOnly String]
+
+    import Tuple.:*
+    summon[(tuple.type :* "four") containsOnly String]
+  }
+
+  test("Tuple.Append preserves containsOnly for an abstract Tuple") {
+    val tuple: Tuple = ("one", "two", "three")
+    given tuple.type containsOnly String = containsOnly.refl
+
+    summon[Tuple.Append[tuple.type, "four"] containsOnly String]
+  }
+
+  test("Tuple.Map with a constant function preserves containsOnly (already supported)") {
+    type Es = (Int, String, Boolean)
+
+    summon[Tuple.Map[Es, [_] =>> List[Int]] containsOnly List[Int]]
+  }
+
+  test("Tuple.Map with a covariant type constructor preserves containsOnly (already supported)") {
+    val tuple = (1, 2, 3)
+
+    summon[Tuple.Map[tuple.type, Option] containsOnly Option[Any]]
+  }
+
+  test(
+    "Tuple.Fold has no blanket containsOnly given: it depends entirely on F, so only Union (a specific Fold) is covered",
+  ) {
+    val tuple: Tuple = (1, 2, 3)
+    given tuple.type containsOnly Int = containsOnly.refl
+
+    // Union[Tup] = Fold[Tup, Nothing, [x, y] =>> x | y] — this specific instantiation is covered.
+    summon[Tuple.Union[tuple.type] <:< Int]
+
+    // A generic Fold isn't: nothing constrains F to preserve "all elements are T" (F could
+    // produce a String out of Ints, e.g. `[x, y] =>> String`), so no sound blanket given can exist.
+  }
+
+  test("Tuple.Split preserves containsOnly via the existing Take/Drop givens") {
+    val tuple = ("one", "two", "three", "four")
+
+    summon[Tuple.Take[tuple.type, 2] containsOnly String]
+    summon[Tuple.Drop[tuple.type, 2] containsOnly String]
+
+    // Tuple.Split[Tup, N] = (Take[Tup, N], Drop[Tup, N]) — a 2-tuple of tuples, not itself
+    // homogeneous in String, so it needs no dedicated given; each half is already covered.
+    val split: Tuple.Split[tuple.type, 2] = (("one", "two"), ("three", "four"))
+    val (taken, dropped) = split
+    summon[taken.type containsOnly String]
+    summon[dropped.type containsOnly String]
   }
