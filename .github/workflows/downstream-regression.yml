@@ -1,0 +1,94 @@
+name: Downstream regression
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Sanity-checks that the in-progress commons changes don't break the libraries built on top
+# of it: made -> mcodec -> alpaca (each depends, directly or transitively, on commons). Every
+# downstream project is checked out at its own `main` and pointed at *this* commons build, then
+# just compiled (no test runs) - a lightweight regression signal, not a compatibility guarantee.
+#
+# `continue-on-error: true` keeps this from blocking merges: a failing step here still shows up
+# clearly (red step, job flagged) but the job's overall conclusion is reported as passing, so it
+# never gates required checks or branch protection.
+jobs:
+  downstream-compile:
+    name: Downstream compile check
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      # Arbitrary placeholder version used to wire each project's local build to the previous
+      # one via the local Ivy repo, instead of whatever real version is currently released.
+      REGRESSION_VERSION: 0.0.0-regression
+      # scala-cli's default 30s wait for the Bloop compilation server to come up is too tight
+      # on a cold GH Actions runner and flakes with a bare TimeoutException; give it more room.
+      # (No env var for this - it has to be passed on every scala-cli invocation below.)
+      BLOOP_TIMEOUT: --bloop-startup-timeout 2min
+    steps:
+      - name: Checkout commons
+        uses: actions/checkout@v7
+        with:
+          path: commons
+      - name: Setup coursier cache
+        uses: coursier/cache-action@v8.1
+      - uses: VirtusLab/scala-cli-setup@v1
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Publish commons locally
+        working-directory: commons
+        run: scala-cli --power publish local . --project-version "$REGRESSION_VERSION" --platform jvm $BLOOP_TIMEOUT
+
+      - name: Checkout made
+        uses: actions/checkout@v7
+        with:
+          repository: halotukozak-com/made
+          path: made
+      - name: Point made at this commons build
+        working-directory: made
+        run: sed -i -E "s#(com\.halotukozak::commons::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" project.scala
+      - name: Compile made
+        working-directory: made
+        run: scala-cli --power compile . --platform jvm $BLOOP_TIMEOUT
+      - name: Publish made locally
+        working-directory: made
+        run: scala-cli --power publish local . --project-version "$REGRESSION_VERSION" --platform jvm $BLOOP_TIMEOUT
+
+      - name: Checkout mcodec
+        uses: actions/checkout@v7
+        with:
+          repository: halotukozak-com/mcodec
+          path: mcodec
+      - name: Point mcodec at this made build
+        working-directory: mcodec
+        run: sed -i -E "s#(com\.halotukozak::made::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" project.scala
+      - name: Compile mcodec
+        # benchmark/ is a separate, unpublished module (see its own project.scala) that pulls in
+        # extra third-party deps and isn't part of the published library - explicit inputs keep
+        # it out of this compile check (a bare `.` would pull it in too and fail unrelated to
+        # this check, since it pins its own commons/made/mcodec dev versions).
+        working-directory: mcodec
+        run: scala-cli --power compile project.scala src --platform jvm $BLOOP_TIMEOUT
+      - name: Publish mcodec locally
+        working-directory: mcodec
+        run: scala-cli --power publish local project.scala src --project-version "$REGRESSION_VERSION" --platform jvm $BLOOP_TIMEOUT
+
+      - name: Checkout alpaca
+        uses: actions/checkout@v7
+        with:
+          repository: halotukozak-com/alpaca
+          path: alpaca
+      - name: Point alpaca at this made/mcodec build
+        working-directory: alpaca
+        run: |
+          sed -i -E "s#(com\.halotukozak::made::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
+          sed -i -E "s#(com\.halotukozak::mcodec::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
+      - name: Compile alpaca
+        working-directory: alpaca
+        run: ./mill __.test
