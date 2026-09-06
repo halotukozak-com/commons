@@ -102,5 +102,8 @@ jobs:
           sed -i -E "s#(com\.halotukozak::made::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
           sed -i -E "s#(com\.halotukozak::mcodec::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
       - name: Compile alpaca
+        # commons/made/mcodec are only published locally for the jvm platform above (see the
+        # publish-local steps), so `__.test` (all platforms) fails resolving made/mcodec's js
+        # and native artifacts. Scope this to alpaca's jvm module, matching what's available.
         working-directory: alpaca
-        run: ./mill __.test
+        run: ./mill jvm.test
