@@ -1,0 +1,109 @@
+name: Downstream regression
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Sanity-checks that the in-progress commons changes don't break the libraries built on top
+# of it: made -> mcodec -> alpaca (each depends, directly or transitively, on commons). Every
+# downstream project is checked out at its own `main` and pointed at *this* commons build, then
+# just compiled (no test runs) - a lightweight regression signal, not a compatibility guarantee.
+#
+# `continue-on-error: true` keeps this from blocking merges: a failing step here still shows up
+# clearly (red step, job flagged) but the job's overall conclusion is reported as passing, so it
+# never gates required checks or branch protection.
+jobs:
+  downstream-compile:
+    name: Downstream compile check
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      # Arbitrary placeholder version used to wire each project's local build to the previous
+      # one via the local Ivy repo, instead of whatever real version is currently released.
+      REGRESSION_VERSION: 0.0.0-regression
+      # scala-cli's default 30s wait for the Bloop compilation server to come up is too tight
+      # on a cold GH Actions runner and flakes with a bare TimeoutException; give it more room.
+      # (No env var for this - it has to be passed on every scala-cli invocation below.)
+      BLOOP_TIMEOUT: --bloop-startup-timeout 2min
+      # --bloop-startup-timeout only covers the initial server spawn. bloop-rifle then re-checks
+      # the server via a `bloop about` call whose timeout is hardcoded to 30s + this env var
+      # (BloopRifleConfig.extraTimeout), so on a cold/slow runner that check can still time out
+      # even though the server actually started fine. This is the only knob that reaches it.
+      SCALA_CLI_EXTRA_TIMEOUT: 90s
+    steps:
+      - name: Checkout commons
+        uses: actions/checkout@v7
+        with:
+          path: commons
+      - name: Setup coursier cache
+        uses: coursier/cache-action@v8.1
+      - uses: VirtusLab/scala-cli-setup@v1
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Publish commons locally
+        working-directory: commons
+        run: scala-cli --power publish local . --project-version "$REGRESSION_VERSION" --platform jvm $BLOOP_TIMEOUT
+
+      - name: Checkout made
+        uses: actions/checkout@v7
+        with:
+          repository: halotukozak-com/made
+          path: made
+      - name: Point made at this commons build
+        working-directory: made
+        run: sed -i -E "s#(com\.halotukozak::commons::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" project.scala
+      - name: Compile made
+        working-directory: made
+        run: scala-cli --power compile . --platform jvm $BLOOP_TIMEOUT
+      - name: Publish made locally
+        working-directory: made
+        run: scala-cli --power publish local . --project-version "$REGRESSION_VERSION" --platform jvm $BLOOP_TIMEOUT
+
+      - name: Checkout mcodec
+        uses: actions/checkout@v7
+        with:
+          repository: halotukozak-com/mcodec
+          path: mcodec
+      - name: Point mcodec at this made/commons build
+        # mcodec builds with Mill (build.mill), not scala-cli, and depends on commons directly
+        # (not just transitively through made) - both pins need patching.
+        working-directory: mcodec
+        run: |
+          sed -i -E "s#(com\.halotukozak::made::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
+          sed -i -E "s#(com\.halotukozak::commons::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
+      - name: Compile mcodec
+        # jvm is one of several sibling modules (jvm/js/native/benchmark) under build.mill;
+        # targeting it directly compiles only the published library's JVM sources, the same
+        # scope the old scala-cli invocation covered, without pulling in benchmark's extra
+        # third-party deps or running any tests.
+        working-directory: mcodec
+        run: ./mill jvm.compile
+      - name: Publish mcodec locally
+        # MCODEC_BENCH_VERSION is mcodec's general override hook for publishVersion (see
+        # build.mill) - reused here to pin the local-Ivy version to $REGRESSION_VERSION so
+        # alpaca's sed'd pin below resolves it, same as its normal benchmark-publish use.
+        working-directory: mcodec
+        run: MCODEC_BENCH_VERSION="$REGRESSION_VERSION" ./mill jvm.publishLocal
+
+      - name: Checkout alpaca
+        uses: actions/checkout@v7
+        with:
+          repository: halotukozak-com/alpaca
+          path: alpaca
+      - name: Point alpaca at this made/mcodec build
+        working-directory: alpaca
+        run: |
+          sed -i -E "s#(com\.halotukozak::made::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
+          sed -i -E "s#(com\.halotukozak::mcodec::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
+      - name: Compile alpaca
+        # commons/made/mcodec are only published locally for the jvm platform above (see the
+        # publish-local steps), so `__.test` (all platforms) fails resolving made/mcodec's js
+        # and native artifacts. Scope this to alpaca's jvm module, matching what's available.
+        working-directory: alpaca
+        run: ./mill jvm.test
