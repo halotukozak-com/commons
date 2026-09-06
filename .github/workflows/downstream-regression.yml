@@ -70,19 +70,26 @@ jobs:
         with:
           repository: halotukozak-com/mcodec
           path: mcodec
-      - name: Point mcodec at this made build
+      - name: Point mcodec at this made/commons build
+        # mcodec builds with Mill (build.mill), not scala-cli, and depends on commons directly
+        # (not just transitively through made) - both pins need patching.
         working-directory: mcodec
-        run: sed -i -E "s#(com\.halotukozak::made::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" project.scala
+        run: |
+          sed -i -E "s#(com\.halotukozak::made::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
+          sed -i -E "s#(com\.halotukozak::commons::)[0-9A-Za-z.+-]+#\1${REGRESSION_VERSION}#" build.mill
       - name: Compile mcodec
-        # benchmark/ is a separate, unpublished module (see its own project.scala) that pulls in
-        # extra third-party deps and isn't part of the published library - explicit inputs keep
-        # it out of this compile check (a bare `.` would pull it in too and fail unrelated to
-        # this check, since it pins its own commons/made/mcodec dev versions).
+        # jvm is one of several sibling modules (jvm/js/native/benchmark) under build.mill;
+        # targeting it directly compiles only the published library's JVM sources, the same
+        # scope the old scala-cli invocation covered, without pulling in benchmark's extra
+        # third-party deps or running any tests.
         working-directory: mcodec
-        run: scala-cli --power compile project.scala src --platform jvm $BLOOP_TIMEOUT
+        run: ./mill jvm.compile
       - name: Publish mcodec locally
+        # MCODEC_BENCH_VERSION is mcodec's general override hook for publishVersion (see
+        # build.mill) - reused here to pin the local-Ivy version to $REGRESSION_VERSION so
+        # alpaca's sed'd pin below resolves it, same as its normal benchmark-publish use.
         working-directory: mcodec
-        run: scala-cli --power publish local project.scala src --project-version "$REGRESSION_VERSION" --platform jvm $BLOOP_TIMEOUT
+        run: MCODEC_BENCH_VERSION="$REGRESSION_VERSION" ./mill jvm.publishLocal
 
       - name: Checkout alpaca
         uses: actions/checkout@v7
