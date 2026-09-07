@@ -9,11 +9,12 @@ trait TailRecTraversable[F[_]]:
 object TailRecTraversable:
 
   private def traverseIterable[A, B, C](xs: IterableOnce[A])(f: A => TailRec[B])(using factory: Factory[B, C])
-    : TailRec[C] =
+    : TailRec[C] = {
     def go(it: Iterator[A]): TailRec[List[B]] =
       if it.hasNext then tailcall(f(it.next())).flatMap(b => tailcall(go(it)).map(b :: _)) else done(Nil)
 
     go(xs.iterator).map(factory.fromSpecific)
+  }
 
   given TailRecTraversable[Option]:
     def traverse[A, B](x: Option[A])(f: A => TailRec[B]): TailRec[Option[B]] = x match
