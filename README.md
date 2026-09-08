@@ -12,13 +12,13 @@ Cross-built for the JVM, Scala.js, and Scala Native. Published to Maven Central 
 scala-cli:
 
 ```scala
-//> using dep com.halotukozak::commons::0.1.2
+//> using dep com.halotukozak::commons::0.3.0
 ```
 
 sbt:
 
 ```scala
-libraryDependencies += "com.halotukozak" %% "commons" % "0.1.2"
+libraryDependencies += "com.halotukozak" %% "commons" % "0.3.0"
 ```
 
 ## What's inside
