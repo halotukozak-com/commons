@@ -5,7 +5,7 @@ import scala.compiletime.ops.boolean.||
 import scala.compiletime.ops.int.S
 import scala.reflect.ClassTag
 
-extension (tup: Tuple)
+extension (tup: Tuple) {
   def foreach(f: [t] => t => Unit): Unit = tup.map[[X] =>> Unit](f)
 
   def indices: Indices[tup.type] = Tuple.fromArray(Array.range(0, tup.size)).asInstanceOf[Indices[tup.type]]
@@ -27,6 +27,7 @@ extension (tup: Tuple)
       arr
   def to[T](using tup.type containsOnly T)[C](factory: Factory[T, C]): C =
     factory.fromSpecific(tup.productIterator.asInstanceOf[Iterator[T]])
+}
 
 type Indices[Tup <: Tuple] <: Tuple = Tup match
   case EmptyTuple => EmptyTuple

@@ -40,7 +40,7 @@ object FromExprFactory:
     : FromExprFactory[T] = new FromExprFactory[T]:
     private lazy val elems = elemInstances
     def apply()(using Type[T]): FromExpr[T] = new FromExpr[T]:
-      def unapply(x: Expr[T])(using quotes: Quotes): Option[T] =
+      def unapply(x: Expr[T])(using quotes: Quotes): Option[T] = {
         import quotes.reflect.*
         val tpe = TypeRepr.of[T]
         val sym = tpe.typeSymbol
@@ -95,6 +95,7 @@ object FromExprFactory:
           case _ => None
 
         args.map(vs => m.fromProduct(Tuple.fromArray(vs.toArray)))
+      }
 
   private def derivedSum[T: Mirror.SumOf](elemInstances: => List[FromExprFactory[Any]]): FromExprFactory[T] =
     new FromExprFactory[T]:
