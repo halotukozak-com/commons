@@ -95,7 +95,7 @@ object FromExprFactory:
           case _ => None
 
         args.map(vs => m.fromProduct(Tuple.fromArray(vs.toArray)))
-  }
+      }
 
   private def derivedSum[T: Mirror.SumOf](elemInstances: => List[FromExprFactory[Any]]): FromExprFactory[T] =
     new FromExprFactory[T]:

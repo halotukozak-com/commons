@@ -266,23 +266,22 @@ def deepRecursiveImpl[T](body: Expr[T], memoized: Boolean)(using Quotes, Type[T]
 
   val loopDefDef = DefDef(
     loopMethod,
-    args =>
-      {
-        val paramSubstitution = termParams.iterator.zip(args.flatten.map(_.asInstanceOf[Term])).toMap
-        val renamedBody = SubstituteIdents(paramSubstitution).transformTerm(body.asTerm)(loopMethod)
-        val loopBody = transform(renamedBody, t => '{ done[T](${ t.asExprOf[T] }) }.asTerm)(using TreePosition.Tail)
-          .changeOwner(loopMethod)
+    { args =>
+      val paramSubstitution = termParams.iterator.zip(args.flatten.map(_.asInstanceOf[Term])).toMap
+      val renamedBody = SubstituteIdents(paramSubstitution).transformTerm(body.asTerm)(loopMethod)
+      val loopBody = transform(renamedBody, t => '{ done[T](${ t.asExprOf[T] }) }.asTerm)(using TreePosition.Tail)
+        .changeOwner(loopMethod)
 
-        memoizedResultsValDef match {
-          case Some(valDef) =>
-            val map = Ref(valDef.symbol).asExprOf[mutable.Map[Any, TailRec[T]]]
-            val arguments: Expr[Any] = args.flatten match
-              case List(single) => single.asExpr
-              case multiple => Expr.ofTupleFromSeq(multiple.map(_.asExpr))
+      memoizedResultsValDef match {
+        case Some(valDef) =>
+          val map = Ref(valDef.symbol).asExprOf[mutable.Map[Any, TailRec[T]]]
+          val arguments: Expr[Any] = args.flatten match
+            case List(single) => single.asExpr
+            case multiple => Expr.ofTupleFromSeq(multiple.map(_.asExpr))
 
-            Some('{ $map.getOrElseUpdate($arguments, ${ loopBody.asExprOf[TailRec[T]] }) }.asTerm.changeOwner(loopMethod))
-          case _ =>
-            Some(loopBody)
+          Some('{ $map.getOrElseUpdate($arguments, ${ loopBody.asExprOf[TailRec[T]] }) }.asTerm.changeOwner(loopMethod))
+        case _ =>
+          Some(loopBody)
       }
     },
   )
