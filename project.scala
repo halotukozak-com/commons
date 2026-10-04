@@ -10,8 +10,8 @@
 //> using options -Yexplicit-nulls
 //> using options -Wsafe-init -Werror
 // methods past the compiler's hardcoded 3000-node coverage-instrumentation threshold (not configurable)
-// are left uninstrumented; CI's -Wall reports that, which -Werror would otherwise turn into an error
-//> using options "-Wconf:msg=Skipping coverage instrumentation.*:s"
+// are left uninstrumented; CI's -Wall reports that, as an info so -Werror doesn't fail on it but it stays visible
+//> using options "-Wconf:msg=Skipping coverage instrumentation.*:i"
 // -Wall's warnings (except -Wsafe-init, set above) are added in CI only: shared ci.yml in halotukozak-com/.github
 // compiler debugging flags, to switch back on while chasing a compiler problem:
 ////> using options -Vprofile -Xprint-inline -Ydebug-flags -Ydebug-missing-refs
