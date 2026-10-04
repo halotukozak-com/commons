@@ -1,7 +1,7 @@
 package scala.quoted
 
 import QuotedFactoryGivens.given
-import scala.annotation.tailrec
+import scala.annotation.{publicInBinary, tailrec}
 import scala.deriving.Mirror
 import scala.reflect.ClassTag
 
@@ -33,7 +33,8 @@ object ToExprFactory:
     case te: ToExprFactory[T] => te
     case given Mirror.Of[T] => derived[T]
 
-  private def derivedProduct[T: Mirror.ProductOf](elemInstances: => List[ToExprFactory[Any]]): ToExprFactory[T] =
+  @publicInBinary private[quoted] def derivedProduct[T: Mirror.ProductOf](elemInstances: => List[ToExprFactory[Any]])
+    : ToExprFactory[T] =
     new ToExprFactory[T]:
       private lazy val elems = elemInstances
       def apply()(using Type[T]): ToExpr[T] = new ToExpr[T]:
@@ -53,7 +54,8 @@ object ToExprFactory:
           val tupleExpr = Expr.ofTupleFromSeq(elemExprs)
           '{ $mirrorExpr.fromProduct($tupleExpr) }
 
-  private def derivedSum[T: Mirror.SumOf as m](elemInstances: => List[ToExprFactory[Any]]): ToExprFactory[T] =
+  @publicInBinary private[quoted] def derivedSum[T: Mirror.SumOf as m](elemInstances: => List[ToExprFactory[Any]])
+    : ToExprFactory[T] =
     new ToExprFactory[T]:
       private lazy val elems = elemInstances
       def apply()(using Type[T]): ToExpr[T] = new ToExpr[T]:

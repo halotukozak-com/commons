@@ -28,7 +28,7 @@ class ForeachTest extends munit.FunSuite:
   test("heterogeneous tuple") {
     val builder = List.newBuilder[Any]
     (1, "two", 3.0, true).foreach([t] => (x: t) => builder += x)
-    assertEquals(builder.result(), List(1, "two", 3.0, true))
+    assertEquals(builder.result(), List[Any](1, "two", 3.0, true))
   }
 
   test("side effects") {
@@ -67,7 +67,7 @@ class ForeachTest extends munit.FunSuite:
   test("foreach with null elements") {
     val builder = List.newBuilder[Any]
     (null, "a", null).foreach([t] => (x: t) => builder += x)
-    assertEquals(builder.result(), List(null, "a", null))
+    assertEquals(builder.result(), List[String | Null](null, "a", null))
   }
 
   test("foreach collects types correctly for homogeneous tuple") {
