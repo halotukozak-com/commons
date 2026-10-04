@@ -62,7 +62,7 @@ class ToTest extends munit.FunSuite:
   test("nullable elements") {
     val tuple: (String | Null, String | Null) = ("hello", null)
     val result = tuple.to[String | Null](List)
-    assertEquals(result, List("hello", null))
+    assertEquals(result, List[String | Null]("hello", null))
   }
 
   test("to Vector") {

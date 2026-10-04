@@ -6,7 +6,7 @@ import scala.compiletime.ops.int.S
 import scala.reflect.ClassTag
 
 extension (tup: Tuple) {
-  def foreach(f: [t] => t => Unit): Unit = tup.map[[X] =>> Unit](f)
+  def foreach(f: [t] => t => Unit): Unit = tup.map[[X] =>> Unit](f): Unit
 
   def indices: Indices[tup.type] = Tuple.fromArray(Array.range(0, tup.size)).asInstanceOf[Indices[tup.type]]
 

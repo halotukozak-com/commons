@@ -79,7 +79,7 @@ class ToArrayOfTest extends munit.FunSuite:
   test("nullable elements") {
     val tuple: (String | Null, String | Null) = ("hello", null)
     val result = tuple.toArrayOf[String | Null]
-    assertEquals(result.toList, List("hello", null))
+    assertEquals(result.toList, List[String | Null]("hello", null))
   }
 
   test("list elements") {
