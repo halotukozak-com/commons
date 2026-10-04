@@ -1,4 +1,4 @@
-//> using scala 3.9.0
+//> using scala 3.10.0
 
 //> using test.dep org.scalameta::munit::1.3.6
 //> using test.dep org.scala-lang::scala3-compiler:3.9.0
