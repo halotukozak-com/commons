@@ -38,7 +38,7 @@ jobs:
         with:
           path: commons
       - name: Setup coursier cache
-        uses: coursier/cache-action@v8.2
+        uses: coursier/cache-action@v9.0
       - uses: VirtusLab/scala-cli-setup@v1
       - name: Set up JDK
         uses: actions/setup-java@v6
