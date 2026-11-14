@@ -22,8 +22,8 @@
 //> using publish.name commons
 //> using publish.computeVersion git:tag
 //> using publish.description "halotukozak's commons"
-//> using publish.url https://github.com/halotukozak/commons
+//> using publish.url https://github.com/halotukozak-com/commons
 //> using publish.license Apache-2.0
-//> using publish.vcs github:halotukozak/commons
+//> using publish.vcs github:halotukozak-com/commons
 //> using publish.repository central
 //> using publish.developer "halotukozak|Bartłomiej Kozak|https://github.com/halotukozak"
