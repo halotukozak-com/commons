@@ -100,4 +100,4 @@ def deepSumOption(w: Wrapped): Int = deepRecursive:
 
 ## License
 
-MIT
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
